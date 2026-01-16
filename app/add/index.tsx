@@ -1,37 +1,90 @@
-import { insertExpense } from '@/lib/db';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Button, TextInput, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Button, Chip, Text, TextInput } from 'react-native-paper';
+import { insertExpense, updateExpense } from '../../lib/db';
 
 export default function AddExpense() {
   const router = useRouter();
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
+  const params = useLocalSearchParams();
+  const isEditing = !!params.id;
 
-  const submit = async () => {
-    if (!amount) return;
-    await insertExpense(parseFloat(amount), note, new Date().toISOString());
+  const categories = ['Food', 'Transport', 'Bills', 'Entertainment', 'General'];
+  const [category, setCategory] = useState(
+    params.category ? (params.category as string) : 'General'
+  );
+  const [amount, setAmount] = useState(
+    params.amount ? (params.amount as string) : ''
+  );
+  const [note, setNote] = useState(params.note ? (params.note as string) : '');
+
+  const handleSave = async () => {
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) return;
+
+    if (isEditing) {
+      await updateExpense(
+        Number(params.id),
+        numAmount,
+        note,
+        params.date as string,
+        category
+      );
+    } else {
+      const today = new Date().toISOString().split('T')[0];
+      await insertExpense(numAmount, note, today, category);
+    }
     router.back();
   };
 
   return (
-    <View style={{ padding: 20 }}>
+    <View style={styles.container}>
       <TextInput
-        placeholder="Amount"
-        keyboardType="numeric"
+        label="Amount"
         value={amount}
         onChangeText={setAmount}
-        style={{ borderWidth: 1, marginBottom: 10, padding: 10 }}
+        keyboardType="decimal-pad"
+        mode="outlined"
+        style={styles.input}
       />
-
       <TextInput
-        placeholder="Note"
+        label="Note"
         value={note}
         onChangeText={setNote}
-        style={{ borderWidth: 1, marginBottom: 10, padding: 10 }}
+        mode="outlined"
+        style={styles.input}
       />
 
-      <Button title="Save Expense" onPress={submit} />
+      <Text style={styles.label}>Category</Text>
+      <View style={styles.categoryContainer}>
+        {categories.map((cat) => (
+          <Chip
+            key={cat}
+            selected={category === cat}
+            onPress={() => setCategory(cat)}
+            style={styles.chip}
+          >
+            {cat}
+          </Chip>
+        ))}
+      </View>
+
+      <Button mode="contained" onPress={handleSave} style={styles.button}>
+        {isEditing ? 'Update' : 'Save'}
+      </Button>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { padding: 20, flex: 1, backgroundColor: '#fff' },
+  input: { marginBottom: 15 },
+  label: { fontSize: 16, fontWeight: 'bold', marginBottom: 10, marginTop: 10 },
+  categoryContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 20,
+  },
+  chip: { marginRight: 8, marginBottom: 8 },
+  button: { marginTop: 10, backgroundColor: '#ff8c00' },
+});

@@ -5,11 +5,9 @@ let db: SQLite.SQLiteDatabase | null = null;
 
 export async function getDB() {
     if (Platform.OS === 'web') return null;
-
     if (!db) {
         db = await SQLite.openDatabaseAsync('expenses.db');
     }
-
     return db;
 }
 
@@ -21,31 +19,123 @@ export async function initDB() {
     CREATE TABLE IF NOT EXISTS expenses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       amount REAL NOT NULL,
-      note TEXT,
-      date TEXT NOT NULL
+      note TEXT NOT NULL,
+      date TEXT NOT NULL,
+      category TEXT DEFAULT 'General'
     );
   `);
 }
 
-export async function insertExpense(
-    amount: number,
-    note: string,
-    date: string
-) {
+// --- WRITE OPERATIONS ---
+
+// --- UPDATED WRITE OPERATIONS ---
+
+export async function insertExpense(amount: number, note: string, date: string, category: string) {
     const database = await getDB();
     if (!database) return;
 
     return await database.runAsync(
-        `INSERT INTO expenses (amount, note, date) VALUES (?, ?, ?)`,
-        [amount, note, date]
+        `INSERT INTO expenses (amount, note, date, category) VALUES (?, ?, ?, ?)`,
+        [amount, note, date, category]
     );
 }
 
-export async function fetchExpenses() {
+export async function updateExpense(id: number, amount: number, note: string, date: string, category: string) {
+    const database = await getDB();
+    if (!database) return;
+
+    return await database.runAsync(
+        `UPDATE expenses SET amount = ?, note = ?, date = ?, category = ? WHERE id = ?`,
+        [amount, note, date, category, id]
+    );
+}
+
+export async function deleteExpense(id: number) {
+    const database = await getDB();
+    if (!database) return;
+
+    return await database.runAsync(
+        `DELETE FROM expenses WHERE id = ?`,
+        [id]
+    );
+}
+
+export async function fetchFilteredExpenses(filters: {
+    startDate?: string;
+    endDate?: string;
+    category?: string;
+    minAmount?: number;
+}) {
     const database = await getDB();
     if (!database) return [];
 
-    return await database.getAllAsync(
-        `SELECT * FROM expenses ORDER BY date DESC`
+    let query = `SELECT * FROM expenses WHERE 1=1`;
+    const params: (string | number)[] = []; // Use explicit types
+
+    // 1. Check Date filters (ensure they aren't empty strings)
+    if (filters.startDate && filters.startDate.length > 0) {
+        query += ` AND date >= ?`;
+        params.push(filters.startDate);
+    }
+    if (filters.endDate && filters.endDate.length > 0) {
+        query += ` AND date <= ?`;
+        params.push(filters.endDate);
+    }
+
+    // 2. Check Category (ignore 'All')
+    if (filters.category && filters.category !== 'All') {
+        query += ` AND category = ?`;
+        params.push(filters.category);
+    }
+
+    // 3. Strict check for minAmount (avoids pushing NaN or undefined)
+    if (filters.minAmount !== undefined && filters.minAmount !== null && !isNaN(filters.minAmount)) {
+        query += ` AND amount >= ?`;
+        params.push(filters.minAmount);
+    }
+
+    query += ` ORDER BY date DESC`;
+
+    try {
+        // This is where the NullPointerException usually happens
+        // We ensure 'params' only contains valid strings or numbers
+        return await database.getAllAsync(query, params);
+    } catch (error) {
+        console.error("SQLite Filter Error:", error);
+        return []; // Return empty list rather than crashing
+    }
+}
+
+/**
+ * Calculates the total expenses for a specific date.
+ * @param date - Format: YYYY-MM-DD
+ */
+export async function getDailyTotal(date: string): Promise<number> {
+    const database = await getDB();
+    if (!database) return 0;
+
+    // We use ROUND to mitigate floating point errors (e.g., 1.1 + 2.2 = 3.30000003)
+    const result: any = await database.getFirstAsync(
+        `SELECT ROUND(SUM(amount), 2) as total FROM expenses WHERE date = ?`,
+        [date]
     );
+
+    return result?.total || 0;
+}
+
+/**
+ * Calculates the total expenses for a specific month.
+ * @param monthPrefix - Format: YYYY-MM (e.g., "2023-10")
+ */
+export async function getMonthlyTotal(monthPrefix: string): Promise<number> {
+    const database = await getDB();
+    if (!database) return 0;
+
+    // Uses the LIKE operator to match any date starting with "YYYY-MM"
+    const result: any = await database.getFirstAsync(
+        `SELECT ROUND(SUM(amount), 2) as total FROM expenses WHERE date LIKE ?`,
+        [`${monthPrefix}%`]
+    );
+
+    return result?.total || 0;
 }

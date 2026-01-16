@@ -1,63 +1,277 @@
-import { format, isSameDay, isSameMonth } from 'date-fns';
-import { Link, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
-import { fetchExpenses } from '../lib/db';
+import { format } from 'date-fns';
+import { Link, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+  Alert,
+  FlatList,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+
+import MonthlyChart from '@/components/MonthlyChart';
+import { SwipeableExpenseRow } from '@/components/SwipeableExpenseRow'; // Your new component
+import {
+  deleteExpense,
+  fetchFilteredExpenses,
+  getDailyTotal,
+  getMonthlyTotal,
+} from '../lib/db';
+
+import { Button, Chip, TextInput } from 'react-native-paper';
 
 type Expense = {
   id: number;
   amount: number;
-  note: string | null;
+  note: string;
   date: string;
+  category: string;
 };
 
 export default function Home() {
+  const router = useRouter();
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [todayTotal, setTodayTotal] = useState(0);
+  const [monthTotal, setMonthTotal] = useState(0);
 
-  const load = async () => {
-    const data = (await fetchExpenses()) as Expense[];
-    setExpenses(data);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  const [filterCategory, setFilterCategory] = useState('All');
+  const [minAmount, setMinAmount] = useState('');
+
+  const categories = [
+    'All',
+    'Food',
+    'Transport',
+    'Bills',
+    'Entertainment',
+    'General',
+  ];
+
+  const loadData = async () => {
+    const cleanMinInput = minAmount.trim() === '' ? undefined : minAmount;
+
+    const parsedAmount = cleanMinInput ? parseFloat(cleanMinInput) : undefined;
+
+    const data = await fetchFilteredExpenses({
+      category: filterCategory,
+      // 3. Final validation check
+      minAmount:
+        typeof parsedAmount === 'number' && !isNaN(parsedAmount)
+          ? parsedAmount
+          : undefined,
+      startDate: selectedDate || undefined,
+      endDate: selectedDate || undefined,
+    });
+
+    setExpenses(data as Expense[]);
+
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const monthPrefix = format(new Date(), 'yyyy-MM');
+    const [daily, monthly] = await Promise.all([
+      getDailyTotal(todayStr),
+      getMonthlyTotal(monthPrefix),
+    ]);
+    setTodayTotal(daily);
+    setMonthTotal(monthly);
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [])
-  );
+  useEffect(() => {
+    loadData();
+  }, [filterCategory, minAmount, selectedDate]);
 
-  const todayTotal = expenses
-    .filter((e) => isSameDay(new Date(e.date), new Date()))
-    .reduce((sum, e) => sum + e.amount, 0);
+  const handleDelete = async (id: number) => {
+    Alert.alert(
+      'Delete Expense',
+      'Are you sure you want to remove this record?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteExpense(id);
+            loadData(); // Refresh all state
+          },
+        },
+      ]
+    );
+  };
 
-  const monthTotal = expenses
-    .filter((e) => isSameMonth(new Date(e.date), new Date()))
-    .reduce((sum, e) => sum + e.amount, 0);
+  const resetFilters = () => {
+    setFilterCategory('All');
+    setMinAmount('');
+    setSelectedDate(null);
+  };
+  const isFiltered =
+    filterCategory !== 'All' || minAmount !== '' || selectedDate !== null;
 
   return (
-    <View style={{ flex: 1, padding: 20 }}>
-      <Text>Today: ${todayTotal.toFixed(2)}</Text>
-      <Text>This Month: ${monthTotal.toFixed(2)}</Text>
+    <View style={styles.container}>
+      {/* Aggregation Header */}
+      <View style={styles.summaryContainer}>
+        <View style={styles.summaryBox}>
+          <Text style={styles.summaryLabel}>Today</Text>
+          <Text style={styles.summaryValue}>${todayTotal.toFixed(2)}</Text>
+        </View>
+        <View style={styles.summaryBox}>
+          <Text style={styles.summaryLabel}>This Month</Text>
+          <Text style={styles.summaryValue}>${monthTotal.toFixed(2)}</Text>
+        </View>
+      </View>
 
+      <View style={styles.filterHeader}>
+        <Text style={styles.sectionTitle}>Filters</Text>
+        {isFiltered && (
+          <Button
+            mode="text"
+            compact
+            onPress={resetFilters}
+            textColor="#ff8c00"
+          >
+            Clear All
+          </Button>
+        )}
+      </View>
+
+      {/* 2. Filter Section */}
+      <View style={styles.filterSection}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoryScroll}
+        >
+          {categories.map((cat) => (
+            <Chip
+              key={cat}
+              selected={filterCategory === cat}
+              onPress={() => setFilterCategory(cat)}
+              style={styles.chip}
+            >
+              {cat}
+            </Chip>
+          ))}
+        </ScrollView>
+
+        <TextInput
+          placeholder="Min Amount"
+          value={minAmount}
+          onChangeText={setMinAmount}
+          keyboardType="numeric"
+          mode="outlined"
+          dense
+          style={styles.minAmountInput}
+          right={
+            minAmount ? (
+              <TextInput.Icon icon="close" onPress={() => setMinAmount('')} />
+            ) : null
+          }
+        />
+      </View>
+
+      {selectedDate && (
+        <Chip
+          icon="calendar"
+          onClose={() => setSelectedDate(null)}
+          style={styles.activeDateChip}
+        >
+          Viewing: {selectedDate}
+        </Chip>
+      )}
+
+      <MonthlyChart
+        expenses={expenses}
+        selectedDate={selectedDate}
+        onDayPress={(date) => setSelectedDate(date)}
+      />
       <FlatList
         data={expenses}
         keyExtractor={(item) => item.id.toString()}
+        contentContainerStyle={{ paddingBottom: 100 }}
         renderItem={({ item }) => (
-          <Text>
-            {format(new Date(item.date), 'dd MMM')} – ${item.amount}
-            {item.note ? ` (${item.note})` : ''}
-          </Text>
+          <SwipeableExpenseRow
+            item={item}
+            onDelete={() => handleDelete(item.id)}
+            onPress={() =>
+              router.push({
+                pathname: '/add',
+                params: {
+                  id: item.id,
+                  amount: item.amount.toString(),
+                  note: item.note,
+                  date: item.date,
+                  category: item.category,
+                },
+              })
+            }
+          />
         )}
       />
 
-      <Link href={'/add'} asChild>
-        <Pressable
-          style={{ padding: 10, backgroundColor: '#000', marginTop: 20 }}
-        >
-          <Text style={{ color: '#fff', textAlign: 'center' }}>
-            Add Expense
-          </Text>
+      <Link href="/add" asChild>
+        <Pressable style={styles.fab}>
+          <Text style={styles.fabText}>+</Text>
         </Pressable>
       </Link>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, padding: 20, backgroundColor: '#f8f9fa' },
+  summaryContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  summaryBox: {
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 12,
+    width: '48%',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  summaryLabel: { color: '#6c757d', fontSize: 14, marginBottom: 4 },
+  summaryValue: { fontSize: 20, fontWeight: 'bold', color: '#212529' },
+  fab: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#007bff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  fabText: { color: '#fff', fontSize: 32, fontWeight: '300' },
+  filterSection: { marginBottom: 15 },
+  categoryScroll: { marginBottom: 10 },
+  chip: { marginRight: 8 },
+  minAmountInput: { height: 40, backgroundColor: '#fff' },
+  filterHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#495057',
+  },
+  activeDateChip: {
+    backgroundColor: '#fff4e5', // Light orange background
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+  },
+});
