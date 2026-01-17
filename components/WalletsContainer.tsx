@@ -47,7 +47,7 @@ const WalletsContainer = () => {
         >
           <Text style={{ fontWeight: 'bold', color: '#666' }}>MY WALLETS</Text>
           <Text style={{ color: '#ff8c00' }}>See All →</Text>
-        </View>{' '}
+        </View>
         {/* Use Array.isArray and length check together */}
         {Array.isArray(wallets) && wallets.length > 0 ? (
           wallets.map((wallet) => (

@@ -1,52 +1,28 @@
-import { format } from 'date-fns';
 import { Dimensions, View } from 'react-native';
 import { BarChart } from 'react-native-chart-kit';
 
 interface ChartProps {
   expenses: { amount: number; date: string }[];
-  onDayPress: (date: string) => void;
-  selectedDate: string | null; // Added prop to track selection
 }
 
-export default function MonthlyChart({
-  expenses,
-  onDayPress,
-  selectedDate,
-}: ChartProps) {
-  const now = new Date();
-  const yearMonth = format(now, 'yyyy-MM');
-
+export default function MonthlyChart({ expenses }: ChartProps) {
   const daysInMonth = Array.from({ length: 31 }, (_, i) => i + 1);
 
   // Grouping logic
-  const dailyTotals = expenses.reduce((acc, curr) => {
-    const day = parseInt(curr.date.split('-')[2], 10);
-    acc[day] = (acc[day] || 0) + curr.amount;
-    return acc;
-  }, {} as Record<number, number>);
+  const dailyTotals = expenses.reduce(
+    (acc, curr) => {
+      const day = parseInt(curr.date.split('-')[2], 10);
+      acc[day] = (acc[day] || 0) + curr.amount;
+      return acc;
+    },
+    {} as Record<number, number>
+  );
 
   const dataValues = daysInMonth.map((day) => dailyTotals[day] || 0);
 
-  // --- HIGHLIGHT LOGIC ---
-  // Create an array of color functions, one for each bar
-  const barColors = daysInMonth.map((day) => {
-    const dayPadded = day.toString().padStart(2, '0');
-    const fullDate = `${yearMonth}-${dayPadded}`;
-
-    // If this bar's date matches the selectedDate, highlight it orange
-    if (fullDate === selectedDate) {
-      return (opacity = 1) => `rgba(255, 140, 0, ${opacity})`; // #ff8c00
-    }
-    // Otherwise, use the default blue
+  const barColors = daysInMonth.map(() => {
     return (opacity = 1) => `rgba(0, 123, 255, ${opacity})`;
   });
-
-  const handleBarPress = (data: any) => {
-    const day = daysInMonth[data.index];
-    const dayPadded = day.toString().padStart(2, '0');
-    const fullDate = `${yearMonth}-${dayPadded}`;
-    onDayPress(fullDate);
-  };
 
   return (
     <View style={{ alignItems: 'center' }}>
@@ -59,7 +35,7 @@ export default function MonthlyChart({
             datasets: [
               {
                 data: dataValues,
-                colors: barColors, // Pass the array of color functions here
+                colors: barColors,
               },
             ],
           },
@@ -68,9 +44,8 @@ export default function MonthlyChart({
           yAxisLabel: '$',
           yAxisSuffix: '',
           fromZero: true,
-          flatColor: true, // Required for individual bar colors to work correctly
-          withCustomBarColorFromData: true, // Required for individual bar colors
-          onDataPointClick: handleBarPress,
+          flatColor: true, 
+          withCustomBarColorFromData: true, 
           chartConfig: {
             backgroundColor: '#ffffff',
             backgroundGradientFrom: '#ffffff',

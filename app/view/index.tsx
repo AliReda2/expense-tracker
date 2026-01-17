@@ -1,17 +1,9 @@
-import { format } from 'date-fns';
-import { Link } from 'expo-router';
+import { SwipeableExpenseRow } from '@/components/SwipeableExpenseRow';
+import { deleteExpense, fetchFilteredExpenses } from '@/lib/db';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-
-import MonthlyChart from '@/components/MonthlyChart';
-import {
-  fetchFilteredExpenses,
-  getDailyTotal,
-  getMonthlyTotal,
-} from '../lib/db';
-
-import WalletsContainer from '@/components/WalletsContainer';
-import { Button, Chip, TextInput } from 'react-native-paper';
+import { Alert, FlatList, ScrollView, StyleSheet, View } from 'react-native';
+import { Chip, TextInput } from 'react-native-paper';
 
 type Expense = {
   id: number;
@@ -21,10 +13,10 @@ type Expense = {
   category: string;
 };
 
-export default function Home() {
+const ViewExpenses = () => {
+  const router = useRouter();
+
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [todayTotal, setTodayTotal] = useState(0);
-  const [monthTotal, setMonthTotal] = useState(0);
 
   const [filterCategory, setFilterCategory] = useState('All');
   const [minAmount, setMinAmount] = useState('');
@@ -54,62 +46,30 @@ export default function Home() {
     });
 
     setExpenses(data as Expense[]);
-
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const monthPrefix = format(new Date(), 'yyyy-MM');
-    const [daily, monthly] = await Promise.all([
-      getDailyTotal(todayStr),
-      getMonthlyTotal(monthPrefix),
-    ]);
-    setTodayTotal(daily);
-    setMonthTotal(monthly);
   };
 
   useEffect(() => {
     loadData();
   }, [filterCategory, minAmount]);
-
-  const resetFilters = () => {
-    setFilterCategory('All');
-    setMinAmount('');
+  const handleDelete = async (id: number) => {
+    Alert.alert(
+      'Delete Expense',
+      'Are you sure you want to remove this record?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteExpense(id);
+            loadData(); // Refresh all state
+          },
+        },
+      ]
+    );
   };
-  const isFiltered =
-    filterCategory !== 'All' || minAmount !== '';
-
   return (
-    <View style={styles.container}>
-      {/* wallets */}
-      <View style={{ marginBottom: 20 }}>
-        <WalletsContainer />
-      </View>
-
-      {/* Summary */}
-      <View style={styles.summaryContainer}>
-        <View style={styles.summaryBox}>
-          <Text style={styles.summaryLabel}>Today</Text>
-          <Text style={styles.summaryValue}>${todayTotal.toFixed(2)}</Text>
-        </View>
-        <View style={styles.summaryBox}>
-          <Text style={styles.summaryLabel}>This Month</Text>
-          <Text style={styles.summaryValue}>${monthTotal.toFixed(2)}</Text>
-        </View>
-      </View>
-
-      {/* 2. Filter Section */}
-      <View style={styles.filterHeader}>
-        <Text style={styles.sectionTitle}>Filters</Text>
-        {isFiltered && (
-          <Button
-            mode="text"
-            compact
-            onPress={resetFilters}
-            textColor="#ff8c00"
-          >
-            Clear All
-          </Button>
-        )}
-      </View>
-
+    <View>
       <View style={styles.filterSection}>
         <ScrollView
           horizontal
@@ -143,25 +103,32 @@ export default function Home() {
           }
         />
       </View>
-
-
-      <MonthlyChart
-        expenses={expenses}
+      <FlatList
+        data={expenses}
+        keyExtractor={(item) => item.id.toString()}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        renderItem={({ item }) => (
+          <SwipeableExpenseRow
+            item={item}
+            onDelete={() => handleDelete(item.id)}
+            onPress={() =>
+              router.push({
+                pathname: '/add',
+                params: {
+                  id: item.id,
+                  amount: item.amount.toString(),
+                  note: item.note,
+                  date: item.date,
+                  category: item.category,
+                },
+              })
+            }
+          />
+        )}
       />
-
-      <Link href="/view" asChild>
-        <Pressable>
-          <Text >View Expenses</Text>
-        </Pressable>
-      </Link>
-      <Link href="/add" asChild>
-        <Pressable style={styles.fab}>
-          <Text style={styles.fabText}>+</Text>
-        </Pressable>
-      </Link>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: '#f8f9fa' },
@@ -219,3 +186,5 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
 });
+
+export default ViewExpenses;

@@ -115,7 +115,13 @@ export async function fetchWalletById(id: number) {
         id,
     ]);
 }
-export async function fetchWallets() {
+type Wallet = {
+  id: number;
+  name: string;
+  amount: number;
+};
+
+export async function fetchWallets():Promise<Wallet[]> {
     const database = await getDB();
     if (!database) return [];
 

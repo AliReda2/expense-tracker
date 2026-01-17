@@ -26,18 +26,16 @@ export default function RootLayout() {
             },
 
             contentStyle: {
-              paddingHorizontal: 10,
-              paddingTop: 10,
               backgroundColor: '#fff',
             },
           }}
         >
           <Stack.Screen name="index" options={{ title: 'Home' }} />
           <Stack.Screen name="add" options={{ headerTitle: 'Add Expense' }} />
-          <Stack.Screen name="wallets" options={{ headerTitle: 'Wallets' }} />
+          <Stack.Screen name="view" options={{ headerTitle: 'View Expense' }} />
+          <Stack.Screen name="wallets" options={{ headerShown: false }} />
         </Stack>
       </PaperProvider>
     </GestureHandlerRootView>
   );
 }
-

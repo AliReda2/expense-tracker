@@ -1,7 +1,8 @@
-import { fetchWallets } from '@/lib/db';
+import { deleteWallet, fetchWallets } from '@/lib/db';
 import { Link } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -9,6 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { IconButton } from 'react-native-paper';
 
 type Wallet = {
   id: number;
@@ -36,6 +38,24 @@ const Wallets = () => {
     loadData();
   }, []);
 
+  const handleDelete = async (id: number) => {
+    Alert.alert(
+      'Delete Expense',
+      'Are you sure you want to remove this record?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteWallet(id);
+            loadData(); // Refresh all state
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -52,13 +72,25 @@ const Wallets = () => {
         {wallets.length > 0 ? (
           wallets.map((wallet) => (
             <View key={wallet.id} style={styles.walletItem}>
-              <Text style={styles.walletName}>{wallet.name}</Text>
-              <Text>Amount: ${wallet.amount}</Text>
-              <Link href={`/wallets/edit/${wallet.id}`} asChild>
-                <Pressable>
-                  <Text>Edit</Text>
+              <View>
+                <Text style={styles.walletName}>{wallet.name}</Text>
+                <Text>Amount: ${wallet.amount}</Text>
+              </View>
+              <View style={styles.walletActions}>
+                <Link href={`/wallets/edit/${wallet.id}`} asChild>
+                  <Pressable style={styles.editContainer}>
+                    <Text>Edit</Text>
+                  </Pressable>
+                </Link>
+                <Pressable style={styles.deleteContainer}>
+                  <IconButton
+                    icon="trash-can"
+                    iconColor="white"
+                    size={24}
+                    onPress={() => handleDelete(wallet.id)}
+                  />
                 </Pressable>
-              </Link>
+              </View>
             </View>
           ))
         ) : (
@@ -76,13 +108,21 @@ const Wallets = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: '#f8f9fa' },
+  container: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+  },
   emptyCenter: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   walletItem: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     padding: 15,
     borderBottomWidth: 1,
     borderColor: '#ccc',
@@ -91,6 +131,11 @@ const styles = StyleSheet.create({
   walletName: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  walletActions: {
+    flexDirection: 'row',
+    gap: 7,
+    alignItems: 'center',
   },
   fab: {
     position: 'absolute',
@@ -108,6 +153,22 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   fabText: { color: '#fff', fontSize: 32, fontWeight: '300' },
+  deleteContainer: {
+    backgroundColor: '#dd2c00',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+  },
+  editContainer: {
+    backgroundColor: '#16df20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+  },
 });
 
 export default Wallets;
