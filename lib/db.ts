@@ -24,13 +24,33 @@ export async function initDB() {
       category TEXT DEFAULT 'General'
     );
   `);
+    await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS wallets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    amount REAL NOT NULL
+    );
+  `);
 }
 
-// --- WRITE OPERATIONS ---
+// --- INSERT OPERATIONS ---
 
-// --- UPDATED WRITE OPERATIONS ---
+export async function insertWallet(name: string, amount: number) {
+    const database = await getDB();
+    if (!database) return;
 
-export async function insertExpense(amount: number, note: string, date: string, category: string) {
+    return await database.runAsync(
+        `INSERT INTO wallets (name,amount) VALUES (?, ?)`,
+        [name, amount]
+    );
+}
+
+export async function insertExpense(
+    amount: number,
+    note: string,
+    date: string,
+    category: string
+) {
     const database = await getDB();
     if (!database) return;
 
@@ -40,7 +60,25 @@ export async function insertExpense(amount: number, note: string, date: string, 
     );
 }
 
-export async function updateExpense(id: number, amount: number, note: string, date: string, category: string) {
+// --- UPDATE OPERATIONS ---
+
+export async function updateWallet(id: number, name: string, amount: number) {
+    const database = await getDB();
+    if (!database) return;
+
+    return await database.runAsync(
+        `UPDATE wallets SET amount = ?, name = ? WHERE id = ?`,
+        [amount, name, id]
+    );
+}
+
+export async function updateExpense(
+    id: number,
+    amount: number,
+    note: string,
+    date: string,
+    category: string
+) {
     const database = await getDB();
     if (!database) return;
 
@@ -50,14 +88,39 @@ export async function updateExpense(id: number, amount: number, note: string, da
     );
 }
 
+// --- DELETE OPERATIONS ---
+
+export async function deleteWallet(id: number) {
+    const database = await getDB();
+    if (!database) return;
+
+    return await database.runAsync(`DELETE FROM wallets WHERE id = ?`, [id]);
+}
 export async function deleteExpense(id: number) {
     const database = await getDB();
     if (!database) return;
 
-    return await database.runAsync(
-        `DELETE FROM expenses WHERE id = ?`,
-        [id]
-    );
+    return await database.runAsync(`DELETE FROM expenses WHERE id = ?`, [id]);
+}
+
+// --- FETCH OPERATIONS ---
+
+export async function fetchWalletById(id: number) {
+    const database = await getDB();
+    if (!database) return null; // Or [] depending on your preference
+
+    // Use '?' as a placeholder to prevent SQL injection
+    // The library safely escapes the value of 'id'
+    return await database.getFirstAsync('SELECT * FROM wallets WHERE id = ?', [
+        id,
+    ]);
+}
+export async function fetchWallets() {
+    const database = await getDB();
+    if (!database) return [];
+
+    // Use getAllAsync to retrieve rows
+    return await database.getAllAsync(`SELECT * FROM wallets`);
 }
 
 export async function fetchFilteredExpenses(filters: {
@@ -89,7 +152,11 @@ export async function fetchFilteredExpenses(filters: {
     }
 
     // 3. Strict check for minAmount (avoids pushing NaN or undefined)
-    if (filters.minAmount !== undefined && filters.minAmount !== null && !isNaN(filters.minAmount)) {
+    if (
+        filters.minAmount !== undefined &&
+        filters.minAmount !== null &&
+        !isNaN(filters.minAmount)
+    ) {
         query += ` AND amount >= ?`;
         params.push(filters.minAmount);
     }
@@ -101,7 +168,7 @@ export async function fetchFilteredExpenses(filters: {
         // We ensure 'params' only contains valid strings or numbers
         return await database.getAllAsync(query, params);
     } catch (error) {
-        console.error("SQLite Filter Error:", error);
+        console.error('SQLite Filter Error:', error);
         return []; // Return empty list rather than crashing
     }
 }

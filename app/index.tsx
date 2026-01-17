@@ -20,6 +20,7 @@ import {
   getMonthlyTotal,
 } from '../lib/db';
 
+import WalletsContainer from '@/components/WalletsContainer';
 import { Button, Chip, TextInput } from 'react-native-paper';
 
 type Expense = {
@@ -110,7 +111,12 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
-      {/* Aggregation Header */}
+      {/* wallets */}
+      <View style={{ marginBottom: 20 }}>
+        <WalletsContainer />
+      </View>
+
+      {/* Summary */}
       <View style={styles.summaryContainer}>
         <View style={styles.summaryBox}>
           <Text style={styles.summaryLabel}>Today</Text>
@@ -122,6 +128,7 @@ export default function Home() {
         </View>
       </View>
 
+      {/* 2. Filter Section */}
       <View style={styles.filterHeader}>
         <Text style={styles.sectionTitle}>Filters</Text>
         {isFiltered && (
@@ -136,7 +143,6 @@ export default function Home() {
         )}
       </View>
 
-      {/* 2. Filter Section */}
       <View style={styles.filterSection}>
         <ScrollView
           horizontal
