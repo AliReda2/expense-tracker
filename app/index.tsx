@@ -1,7 +1,15 @@
+import { useRefresh } from '@/hooks/useRefresh';
 import { format } from 'date-fns';
 import { Link } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import MonthlyChart from '@/components/MonthlyChart';
 import {
@@ -65,6 +73,8 @@ export default function Home() {
     setMonthTotal(monthly);
   };
 
+  const { refreshing, onRefresh } = useRefresh(loadData);
+
   useEffect(() => {
     loadData();
   }, [filterCategory, minAmount]);
@@ -77,79 +87,91 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
-      {/* wallets */}
-      <View style={{ marginBottom: 20 }}>
-        <WalletsContainer />
-      </View>
-
-      {/* Summary */}
-      <View style={styles.summaryContainer}>
-        <View style={styles.summaryBox}>
-          <Text style={styles.summaryLabel}>Today</Text>
-          <Text style={styles.summaryValue}>${todayTotal.toFixed(2)}</Text>
+      <ScrollView
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#ff8c00']}
+            tintColor="#ff8c00"
+          />
+        }
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* wallets */}
+        <View style={{ marginBottom: 20 }}>
+          <WalletsContainer />
         </View>
-        <View style={styles.summaryBox}>
-          <Text style={styles.summaryLabel}>This Month</Text>
-          <Text style={styles.summaryValue}>${monthTotal.toFixed(2)}</Text>
+
+        {/* Summary */}
+        <View style={styles.summaryContainer}>
+          <View style={styles.summaryBox}>
+            <Text style={styles.summaryLabel}>Today</Text>
+            <Text style={styles.summaryValue}>${todayTotal.toFixed(2)}</Text>
+          </View>
+          <View style={styles.summaryBox}>
+            <Text style={styles.summaryLabel}>This Month</Text>
+            <Text style={styles.summaryValue}>${monthTotal.toFixed(2)}</Text>
+          </View>
         </View>
-      </View>
 
-      {/* 2. Filter Section */}
-      <View style={styles.filterHeader}>
-        <Text style={styles.sectionTitle}>Filters</Text>
-        {isFiltered && (
-          <Button
-            mode="text"
-            compact
-            onPress={resetFilters}
-            textColor="#ff8c00"
-          >
-            Clear All
-          </Button>
-        )}
-      </View>
-
-      <View style={styles.filterSection}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryScroll}
-        >
-          {categories.map((cat) => (
-            <Chip
-              key={cat}
-              selected={filterCategory === cat}
-              onPress={() => setFilterCategory(cat)}
-              style={styles.chip}
+        {/* 2. Filter Section */}
+        <View style={styles.filterHeader}>
+          <Text style={styles.sectionTitle}>Filters</Text>
+          {isFiltered && (
+            <Button
+              mode="text"
+              compact
+              onPress={resetFilters}
+              textColor="#ff8c00"
             >
-              {cat}
-            </Chip>
-          ))}
-        </ScrollView>
+              Clear All
+            </Button>
+          )}
+        </View>
 
-        <TextInput
-          placeholder="Min Amount"
-          value={minAmount}
-          onChangeText={setMinAmount}
-          keyboardType="numeric"
-          mode="outlined"
-          dense
-          style={styles.minAmountInput}
-          right={
-            minAmount ? (
-              <TextInput.Icon icon="close" onPress={() => setMinAmount('')} />
-            ) : null
-          }
-        />
-      </View>
+        <View style={styles.filterSection}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.categoryScroll}
+          >
+            {categories.map((cat) => (
+              <Chip
+                key={cat}
+                selected={filterCategory === cat}
+                onPress={() => setFilterCategory(cat)}
+                style={styles.chip}
+              >
+                {cat}
+              </Chip>
+            ))}
+          </ScrollView>
 
-      <MonthlyChart expenses={expenses} />
+          <TextInput
+            placeholder="Min Amount"
+            value={minAmount}
+            onChangeText={setMinAmount}
+            keyboardType="numeric"
+            mode="outlined"
+            dense
+            style={styles.minAmountInput}
+            right={
+              minAmount ? (
+                <TextInput.Icon icon="close" onPress={() => setMinAmount('')} />
+              ) : null
+            }
+          />
+        </View>
 
-      <Link href="/view" asChild>
-        <Pressable style={styles.viewButton}>
-          <Text style={styles.viewButtonText}>View All Expenses</Text>
-        </Pressable>
-      </Link>
+        <MonthlyChart expenses={expenses} />
+
+        <Link href="/view" asChild>
+          <Pressable style={styles.viewButton}>
+            <Text style={styles.viewButtonText}>View All Expenses</Text>
+          </Pressable>
+        </Link>
+      </ScrollView>
       <Link href="/add" asChild>
         <Pressable style={styles.fab}>
           <Text style={styles.fabText}>+</Text>
@@ -160,7 +182,8 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  scrollContent: { padding: 20, paddingBottom: 100 },
   summaryContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',

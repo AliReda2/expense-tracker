@@ -1,8 +1,16 @@
 import { SwipeableExpenseRow } from '@/components/SwipeableExpenseRow';
+import { useRefresh } from '@/hooks/useRefresh';
 import { deleteExpense, fetchFilteredExpenses } from '@/lib/db';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Alert,
+  FlatList,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { Chip, TextInput } from 'react-native-paper';
 
 type Expense = {
@@ -47,6 +55,8 @@ const ViewExpenses = () => {
 
     setExpenses(data as Expense[]);
   };
+
+  const { refreshing, onRefresh } = useRefresh(loadData);
 
   useEffect(() => {
     loadData();
@@ -107,6 +117,14 @@ const ViewExpenses = () => {
         data={expenses}
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#ff8c00']}
+            tintColor="#ff8c00"
+          />
+        }
         renderItem={({ item }) => (
           <SwipeableExpenseRow
             item={item}
