@@ -51,14 +51,36 @@ const WalletsContainer = () => {
         {/* Use Array.isArray and length check together */}
         {Array.isArray(wallets) && wallets.length > 0 ? (
           wallets.map((wallet) => (
-            <View key={wallet.id} style={{ marginBottom: 10 }}>
-              <Text style={{ fontWeight: 'bold' }}>{wallet.name}</Text>
-              <Text>{wallet.amount}</Text>
+            <View
+              key={wallet.id}
+              style={{
+                marginBottom: 12,
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ fontWeight: '600', color: '#333', fontSize: 15 }}>
+                {wallet.name}
+              </Text>
+              <Text
+                style={{ fontWeight: 'bold', color: '#ff8c00', fontSize: 16 }}
+              >
+                ${wallet.amount.toFixed(2)}
+              </Text>
             </View>
           ))
         ) : (
           <View>
-            <Text>No Wallets Found</Text>
+            <Text
+              style={{
+                color: '#999',
+                textAlign: 'center',
+                paddingVertical: 10,
+              }}
+            >
+              No Wallets Found
+            </Text>
           </View>
         )}
       </TouchableOpacity>

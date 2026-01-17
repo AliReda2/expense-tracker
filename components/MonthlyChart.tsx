@@ -1,4 +1,4 @@
-import { Dimensions, View } from 'react-native';
+import { Dimensions, Text, View } from 'react-native';
 import { BarChart } from 'react-native-chart-kit';
 
 interface ChartProps {
@@ -25,7 +25,20 @@ export default function MonthlyChart({ expenses }: ChartProps) {
   });
 
   return (
-    <View style={{ alignItems: 'center' }}>
+    <View
+      style={{ alignItems: 'center', paddingHorizontal: 16, marginTop: 16 }}
+    >
+      <Text
+        style={{
+          fontSize: 14,
+          fontWeight: '600',
+          color: '#666',
+          marginBottom: 12,
+          alignSelf: 'flex-start',
+        }}
+      >
+        Daily Spending
+      </Text>
       <BarChart
         {...({
           data: {
@@ -44,8 +57,8 @@ export default function MonthlyChart({ expenses }: ChartProps) {
           yAxisLabel: '$',
           yAxisSuffix: '',
           fromZero: true,
-          flatColor: true, 
-          withCustomBarColorFromData: true, 
+          flatColor: true,
+          withCustomBarColorFromData: true,
           chartConfig: {
             backgroundColor: '#ffffff',
             backgroundGradientFrom: '#ffffff',

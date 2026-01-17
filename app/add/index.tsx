@@ -69,7 +69,12 @@ export default function AddExpense() {
         ))}
       </View>
 
-      <Button mode="contained" onPress={handleSave} style={styles.button}>
+      <Button
+        mode="contained"
+        onPress={handleSave}
+        style={styles.button}
+        buttonColor="#ff8c00"
+      >
         {isEditing ? 'Update' : 'Save'}
       </Button>
     </View>
@@ -77,14 +82,21 @@ export default function AddExpense() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, flex: 1, backgroundColor: '#fff' },
-  input: { marginBottom: 15 },
-  label: { fontSize: 16, fontWeight: 'bold', marginBottom: 10, marginTop: 10 },
+  container: { padding: 20, flex: 1, backgroundColor: '#f8f9fa' },
+  input: { marginBottom: 15, backgroundColor: '#fff' },
+  label: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    marginTop: 10,
+    color: '#333',
+  },
   categoryContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginBottom: 20,
+    gap: 8,
   },
-  chip: { marginRight: 8, marginBottom: 8 },
-  button: { marginTop: 10, backgroundColor: '#ff8c00' },
+  chip: { marginBottom: 8 },
+  button: { marginTop: 20, paddingVertical: 8 },
 });

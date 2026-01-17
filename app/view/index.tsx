@@ -69,7 +69,7 @@ const ViewExpenses = () => {
     );
   };
   return (
-    <View>
+    <View style={styles.container}>
       <View style={styles.filterSection}>
         <ScrollView
           horizontal
@@ -131,7 +131,7 @@ const ViewExpenses = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, padding: 16, backgroundColor: '#f8f9fa' },
   summaryContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   fabText: { color: '#fff', fontSize: 32, fontWeight: '300' },
-  filterSection: { marginBottom: 15 },
+  filterSection: { marginBottom: 15, paddingHorizontal: 16 },
   categoryScroll: { marginBottom: 10 },
   chip: { marginRight: 8 },
   minAmountInput: { height: 40, backgroundColor: '#fff' },

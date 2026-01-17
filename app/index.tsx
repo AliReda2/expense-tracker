@@ -73,8 +73,7 @@ export default function Home() {
     setFilterCategory('All');
     setMinAmount('');
   };
-  const isFiltered =
-    filterCategory !== 'All' || minAmount !== '';
+  const isFiltered = filterCategory !== 'All' || minAmount !== '';
 
   return (
     <View style={styles.container}>
@@ -144,14 +143,11 @@ export default function Home() {
         />
       </View>
 
-
-      <MonthlyChart
-        expenses={expenses}
-      />
+      <MonthlyChart expenses={expenses} />
 
       <Link href="/view" asChild>
-        <Pressable>
-          <Text >View Expenses</Text>
+        <Pressable style={styles.viewButton}>
+          <Text style={styles.viewButtonText}>View All Expenses</Text>
         </Pressable>
       </Link>
       <Link href="/add" asChild>
@@ -217,5 +213,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff4e5', // Light orange background
     marginBottom: 10,
     alignSelf: 'flex-start',
+  },
+  viewButton: {
+    backgroundColor: '#ff8c00',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 20,
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  viewButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
