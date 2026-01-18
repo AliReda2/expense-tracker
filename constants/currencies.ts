@@ -4,7 +4,7 @@ export const CURRENCIES = [
     { code: 'GBP', symbol: '£', name: 'British Pound' },
     { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
     { code: 'NGN', symbol: '₦', name: 'Nigerian Naira' },
-    { code: 'LBP', symbol: 'ل.ل', name: 'Lebanese Pound' }, // Fixed
+    { code: 'LBP', symbol: 'ل.ل', name: 'Lebanese Pound' }, 
 ];
 
 export const getCurrencySymbol = (code: string) => {

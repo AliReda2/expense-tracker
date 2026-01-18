@@ -21,9 +21,11 @@ export async function initDB() {
       amount REAL NOT NULL,
       note TEXT NOT NULL,
       date TEXT NOT NULL,
-      category TEXT DEFAULT 'General'
+      category TEXT DEFAULT 'General',
+      currency TEXT DEFAULT 'USD'
     );
   `);
+
     await database.execAsync(`
     CREATE TABLE IF NOT EXISTS wallets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,14 +41,14 @@ export async function initDB() {
 export async function insertWallet(
     name: string,
     amount: number,
-    currency: string
+    currency: string,
 ) {
     const database = await getDB();
     if (!database) return;
 
     return await database.runAsync(
         `INSERT INTO wallets (name,amount,currency) VALUES (?, ?,?)`,
-        [name, amount, currency]
+        [name, amount, currency],
     );
 }
 
@@ -54,14 +56,15 @@ export async function insertExpense(
     amount: number,
     note: string,
     date: string,
-    category: string
+    category: string,
+    currency: string = 'USD',
 ) {
     const database = await getDB();
     if (!database) return;
 
     return await database.runAsync(
-        `INSERT INTO expenses (amount, note, date, category) VALUES (?, ?, ?, ?)`,
-        [amount, note, date, category]
+        `INSERT INTO expenses (amount, note, date, category, currency) VALUES (?, ?, ?, ?, ?)`,
+        [amount, note, date, category, currency],
     );
 }
 
@@ -71,14 +74,14 @@ export async function updateWallet(
     id: number,
     name: string,
     amount: number,
-    currency: string
+    currency: string,
 ) {
     const database = await getDB();
     if (!database) return;
 
     return await database.runAsync(
         `UPDATE wallets SET amount = ?, name = ?, currency = ? WHERE id = ?`,
-        [amount, name, currency, id]
+        [amount, name, currency, id],
     );
 }
 
@@ -87,14 +90,15 @@ export async function updateExpense(
     amount: number,
     note: string,
     date: string,
-    category: string
+    category: string,
+    currency: string,
 ) {
     const database = await getDB();
     if (!database) return;
 
     return await database.runAsync(
-        `UPDATE expenses SET amount = ?, note = ?, date = ?, category = ? WHERE id = ?`,
-        [amount, note, date, category, id]
+        `UPDATE expenses SET amount = ?, note = ?, date = ?, category = ?, currency = ? WHERE id = ?`,
+        [amount, note, date, category, currency, id],
     );
 }
 
@@ -201,7 +205,7 @@ export async function getDailyTotal(date: string): Promise<number> {
     // We use ROUND to mitigate floating point errors (e.g., 1.1 + 2.2 = 3.30000003)
     const result: any = await database.getFirstAsync(
         `SELECT ROUND(SUM(amount), 2) as total FROM expenses WHERE date = ?`,
-        [date]
+        [date],
     );
 
     return result?.total || 0;
@@ -218,7 +222,7 @@ export async function getMonthlyTotal(monthPrefix: string): Promise<number> {
     // Uses the LIKE operator to match any date starting with "YYYY-MM"
     const result: any = await database.getFirstAsync(
         `SELECT ROUND(SUM(amount), 2) as total FROM expenses WHERE date LIKE ?`,
-        [`${monthPrefix}%`]
+        [`${monthPrefix}%`],
     );
 
     return result?.total || 0;

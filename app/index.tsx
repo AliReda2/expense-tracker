@@ -19,7 +19,7 @@ import {
 } from '../lib/db';
 
 import WalletsContainer from '@/components/WalletsContainer';
-import { Button, Chip, TextInput } from 'react-native-paper';
+import { Button, Chip } from 'react-native-paper';
 
 type Expense = {
   id: number;
@@ -148,7 +148,7 @@ export default function Home() {
             ))}
           </ScrollView>
 
-          <TextInput
+          {/* <TextInput
             placeholder="Min Amount"
             value={minAmount}
             onChangeText={setMinAmount}
@@ -161,7 +161,7 @@ export default function Home() {
                 <TextInput.Icon icon="close" onPress={() => setMinAmount('')} />
               ) : null
             }
-          />
+          /> */}
         </View>
 
         <MonthlyChart expenses={expenses} />
