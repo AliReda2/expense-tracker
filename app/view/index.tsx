@@ -1,6 +1,7 @@
 import { SwipeableExpenseRow } from '@/components/SwipeableExpenseRow';
 import { useRefresh } from '@/hooks/useRefresh';
 import { deleteExpense, fetchFilteredExpenses } from '@/lib/db';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -9,6 +10,7 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Text,
   View,
 } from 'react-native';
 import { Chip, TextInput } from 'react-native-paper';
@@ -125,6 +127,21 @@ const ViewExpenses = () => {
             tintColor="#ff8c00"
           />
         }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <MaterialCommunityIcons
+              name="inbox-outline"
+              size={80}
+              color="#ccc"
+            />
+            <Text style={styles.emptyTitle}>No Expenses Found</Text>
+            <Text style={styles.emptySubtitle}>
+              {filterCategory === 'All' && !minAmount
+                ? 'Start tracking your expenses to see them here'
+                : 'Try adjusting your filters'}
+            </Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <SwipeableExpenseRow
             item={item}
@@ -202,6 +219,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff4e5', // Light orange background
     marginBottom: 10,
     alignSelf: 'flex-start',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 80,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#6c757d',
+    marginTop: 16,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#adb5bd',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });
 

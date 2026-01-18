@@ -26,22 +26,27 @@ export async function initDB() {
   `);
     await database.execAsync(`
     CREATE TABLE IF NOT EXISTS wallets (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    amount REAL NOT NULL
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      amount REAL NOT NULL,
+      currency TEXT DEFAULT 'USD' NOT NULL 
     );
   `);
 }
 
 // --- INSERT OPERATIONS ---
 
-export async function insertWallet(name: string, amount: number) {
+export async function insertWallet(
+    name: string,
+    amount: number,
+    currency: string
+) {
     const database = await getDB();
     if (!database) return;
 
     return await database.runAsync(
-        `INSERT INTO wallets (name,amount) VALUES (?, ?)`,
-        [name, amount]
+        `INSERT INTO wallets (name,amount,currency) VALUES (?, ?,?)`,
+        [name, amount, currency]
     );
 }
 
@@ -62,13 +67,18 @@ export async function insertExpense(
 
 // --- UPDATE OPERATIONS ---
 
-export async function updateWallet(id: number, name: string, amount: number) {
+export async function updateWallet(
+    id: number,
+    name: string,
+    amount: number,
+    currency: string
+) {
     const database = await getDB();
     if (!database) return;
 
     return await database.runAsync(
-        `UPDATE wallets SET amount = ?, name = ? WHERE id = ?`,
-        [amount, name, id]
+        `UPDATE wallets SET amount = ?, name = ?, currency = ? WHERE id = ?`,
+        [amount, name, currency, id]
     );
 }
 
@@ -116,12 +126,13 @@ export async function fetchWalletById(id: number) {
     ]);
 }
 type Wallet = {
-  id: number;
-  name: string;
-  amount: number;
+    id: number;
+    name: string;
+    amount: number;
+    currency: string;
 };
 
-export async function fetchWallets():Promise<Wallet[]> {
+export async function fetchWallets(): Promise<Wallet[]> {
     const database = await getDB();
     if (!database) return [];
 

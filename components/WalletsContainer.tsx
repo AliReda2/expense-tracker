@@ -1,4 +1,5 @@
-import { fetchWallets } from '@/lib/db';
+import { fetchWallets, initDB } from '@/lib/db';
+import { formatMoney } from '@/utils/formatMoney';
 import { Link } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
@@ -7,13 +8,15 @@ type Wallet = {
   id: number;
   name: string;
   amount: number;
+  currency: string;
 };
 
-const WalletsContainer = () => {
+const WalletsContainer = ({ refreshing }: { refreshing?: boolean }) => {
   const [wallets, setWallets] = useState<Wallet[]>([]);
 
   const loadData = async () => {
     try {
+      await initDB(); // Ensure DB is initialized
       const data = await fetchWallets();
       // Ensure data is an array, otherwise fallback to empty array
       setWallets(Array.isArray(data) ? data : []);
@@ -26,6 +29,12 @@ const WalletsContainer = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (refreshing) {
+      loadData();
+    }
+  }, [refreshing]);
 
   return (
     <Link href="/wallets" asChild>
@@ -66,7 +75,7 @@ const WalletsContainer = () => {
               <Text
                 style={{ fontWeight: 'bold', color: '#ff8c00', fontSize: 16 }}
               >
-                ${wallet.amount.toFixed(2)}
+                {formatMoney(wallet.amount, wallet.currency)}
               </Text>
             </View>
           ))

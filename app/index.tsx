@@ -100,7 +100,7 @@ export default function Home() {
       >
         {/* wallets */}
         <View style={{ marginBottom: 20 }}>
-          <WalletsContainer />
+          <WalletsContainer refreshing={refreshing} />
         </View>
 
         {/* Summary */}

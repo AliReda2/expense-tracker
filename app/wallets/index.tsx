@@ -1,4 +1,5 @@
 import { deleteWallet, fetchWallets } from '@/lib/db';
+import { formatMoney } from '@/utils/formatMoney';
 import { Link } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -16,6 +17,7 @@ type Wallet = {
   id: number;
   name: string;
   amount: number;
+  currency: string;
 };
 
 const Wallets = () => {
@@ -74,7 +76,9 @@ const Wallets = () => {
             <View key={wallet.id} style={styles.walletItem}>
               <View>
                 <Text style={styles.walletName}>{wallet.name}</Text>
-                <Text>Amount: ${wallet.amount}</Text>
+                <Text>
+                  Amount: {formatMoney(wallet.amount, wallet.currency)}
+                </Text>
               </View>
               <View style={styles.walletActions}>
                 <Link href={`/wallets/edit/${wallet.id}`} asChild>
