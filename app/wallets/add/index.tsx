@@ -1,4 +1,4 @@
-import { CURRENCIES } from '@/constants/currencies'; 
+import { CURRENCIES } from '@/constants/currencies';
 import { insertWallet } from '@/lib/db';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -55,6 +55,12 @@ const AddWallet = () => {
         style={styles.input}
         outlineColor="#ccc"
         activeOutlineColor="#ff8c00"
+        theme={{
+          colors: {
+            onSurfaceVariant: '#9b9b9b', // Colors the label when not focused
+            primary: '#ff8c00', // Colors the label/outline when focused
+          },
+        }}
       />
 
       <View style={styles.row}>
@@ -76,6 +82,12 @@ const AddWallet = () => {
           style={[styles.input, { flex: 1 }]}
           outlineColor="#ccc"
           activeOutlineColor="#ff8c00"
+          theme={{
+            colors: {
+              onSurfaceVariant: '#9b9b9b', // Colors the label when not focused
+              primary: '#ff8c00', // Colors the label/outline when focused
+            },
+          }}
         />
       </View>
 
@@ -118,6 +130,8 @@ const AddWallet = () => {
         onPress={handleSave}
         style={styles.button}
         disabled={!name}
+        textColor="#ffffff"
+        contentStyle={{ flexDirection: 'row-reverse' }}
       >
         Save Wallet
       </Button>
@@ -152,6 +166,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   input: {
+    backgroundColor: '#fff',
     marginBottom: 15,
   },
   button: {

@@ -60,13 +60,20 @@ export default function AddExpense() {
     <View style={styles.container}>
       {/* AMOUNT INPUT */}
       <TextInput
-        label={`Amount (${currency})`} // Show selected currency in label
+        label={`Amount (${currency})`}
         value={amount}
         onChangeText={setAmount}
         keyboardType="decimal-pad"
         mode="outlined"
+        textColor="#000"
         style={styles.input}
-        left={<TextInput.Affix text={currency} />} // Optional: Show currency prefix inside input
+        left={<TextInput.Affix text={currency} textStyle={{ color: '#000' }} />}
+        theme={{
+          colors: {
+            onSurfaceVariant: '#9b9b9b',
+            primary: '#ff8c00',
+          },
+        }}
       />
 
       {/* NOTE INPUT */}
@@ -75,7 +82,14 @@ export default function AddExpense() {
         value={note}
         onChangeText={setNote}
         mode="outlined"
+        textColor="#000"
         style={styles.input}
+        theme={{
+          colors: {
+            onSurfaceVariant: '#9b9b9b',
+            primary: '#ff8c00',
+          },
+        }}
       />
 
       {/* CURRENCY SELECTION */}
