@@ -35,7 +35,6 @@ export default function Home() {
   const [monthTotal, setMonthTotal] = useState(0);
 
   const [filterCategory, setFilterCategory] = useState('All');
-  const [minAmount, setMinAmount] = useState('');
 
   const categories = [
     'All',
@@ -48,17 +47,8 @@ export default function Home() {
   ];
 
   const loadData = async () => {
-    const cleanMinInput = minAmount.trim() === '' ? undefined : minAmount;
-
-    const parsedAmount = cleanMinInput ? parseFloat(cleanMinInput) : undefined;
-
     const data = await fetchFilteredExpenses({
       category: filterCategory,
-      // 3. Final validation check
-      minAmount:
-        typeof parsedAmount === 'number' && !isNaN(parsedAmount)
-          ? parsedAmount
-          : undefined,
     });
 
     setExpenses(data as Expense[]);
@@ -78,14 +68,13 @@ export default function Home() {
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [filterCategory, minAmount]),
+    }, [filterCategory]),
   );
 
   const resetFilters = () => {
     setFilterCategory('All');
-    setMinAmount('');
   };
-  const isFiltered = filterCategory !== 'All' || minAmount !== '';
+  const isFiltered = filterCategory !== 'All';
 
   return (
     <View style={styles.container}>
