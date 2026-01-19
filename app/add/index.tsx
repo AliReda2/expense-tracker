@@ -1,9 +1,16 @@
 import { CURRENCIES } from '@/constants/currencies';
-import { insertExpense, updateExpense } from '@/lib/db';
+import { fetchWallets, insertExpense, updateExpense } from '@/lib/db';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Chip, Text, TextInput } from 'react-native-paper';
+
+type Wallet = {
+  id: number;
+  name: string;
+  amount: number;
+  currency: string;
+};
 
 export default function AddExpense() {
   const router = useRouter();
@@ -20,11 +27,15 @@ export default function AddExpense() {
   ];
 
   // --- STATE ---
+  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [selectedWalletId, setSelectedWalletId] = useState<number | null>(
+    params.walletId ? Number(params.walletId) : null,
+  );
+
   const [category, setCategory] = useState(
     params.category ? (params.category as string) : 'General',
   );
 
-  // Initialize currency from params (if editing) or default to USD
   const [currency, setCurrency] = useState(
     params.currency ? (params.currency as string) : 'USD',
   );
@@ -35,10 +46,35 @@ export default function AddExpense() {
 
   const [note, setNote] = useState(params.note ? (params.note as string) : '');
 
+  // --- LOAD WALLETS ---
+  useEffect(() => {
+    async function loadWallets() {
+      const result = await fetchWallets();
+      setWallets(result);
+
+      if (!isEditing && !selectedWalletId && result.length > 0) {
+        setSelectedWalletId(result[0].id);
+      }
+    }
+    loadWallets();
+  }, []);
+
   // --- SAVE HANDLER ---
   const handleSave = async () => {
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) return;
+
+    // Validation
+    if (isNaN(numAmount) || numAmount <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid positive number.');
+      return;
+    }
+    if (selectedWalletId === null) {
+      Alert.alert(
+        'No Wallet',
+        'Please select a wallet to deduct this expense from.',
+      );
+      return;
+    }
 
     if (isEditing) {
       await updateExpense(
@@ -48,10 +84,18 @@ export default function AddExpense() {
         params.date as string,
         category,
         currency,
+        selectedWalletId,
       );
     } else {
       const today = new Date().toISOString().split('T')[0];
-      await insertExpense(numAmount, note, today, category, currency); // Added currency
+      await insertExpense(
+        numAmount,
+        note,
+        today,
+        category,
+        selectedWalletId,
+        currency,
+      );
     }
     router.back();
   };
@@ -91,6 +135,28 @@ export default function AddExpense() {
           },
         }}
       />
+
+      {/* WALLET SELECTION */}
+      <Text style={styles.label}>Wallet</Text>
+      <View style={styles.scrollContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {wallets.map((wallet) => (
+            <Chip
+              key={wallet.id}
+              selected={selectedWalletId === wallet.id}
+              onPress={() => setSelectedWalletId(wallet.id)}
+              style={styles.chip}
+              showSelectedOverlay
+            >
+              {wallet.name} ({wallet.currency})
+            </Chip>
+          ))}
+        </ScrollView>
+      </View>
 
       {/* CURRENCY SELECTION */}
       <Text style={styles.label}>Currency</Text>
@@ -154,11 +220,11 @@ const styles = StyleSheet.create({
   // Container for horizontal scrolling sections
   scrollContainer: {
     marginBottom: 15,
-    height: 40, // Constrain height to prevent layout jumps
+    height: 40,
   },
   scrollContent: {
-    gap: 8, // Spacing between items in ScrollView
-    paddingRight: 20, // Padding at the end of scroll
+    gap: 8,
+    paddingRight: 20,
   },
   categoryContainer: {
     flexDirection: 'row',

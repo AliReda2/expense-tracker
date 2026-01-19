@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -16,15 +16,17 @@ export async function initDB() {
     if (!database) return;
 
     await database.execAsync(`
-    CREATE TABLE IF NOT EXISTS expenses (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      amount REAL NOT NULL,
-      note TEXT NOT NULL,
-      date TEXT NOT NULL,
-      category TEXT DEFAULT 'General',
-      currency TEXT DEFAULT 'USD'
-    );
-  `);
+  CREATE TABLE IF NOT EXISTS expenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    amount REAL NOT NULL,
+    note TEXT NOT NULL,
+    date TEXT NOT NULL,
+    category TEXT DEFAULT 'General',
+    currency TEXT DEFAULT 'USD',
+    walletId INTEGER,
+    FOREIGN KEY (walletId) REFERENCES wallets (id)
+  );
+`);
 
     await database.execAsync(`
     CREATE TABLE IF NOT EXISTS wallets (
@@ -35,8 +37,6 @@ export async function initDB() {
     );
   `);
 }
-
-// --- INSERT OPERATIONS ---
 
 export async function insertWallet(
     name: string,
@@ -57,18 +57,52 @@ export async function insertExpense(
     note: string,
     date: string,
     category: string,
+    walletId: number,
     currency: string = 'USD',
 ) {
     const database = await getDB();
-    if (!database) return;
+    if (!database) {
+        throw new Error('Database not initialized');
+    }
 
-    return await database.runAsync(
-        `INSERT INTO expenses (amount, note, date, category, currency) VALUES (?, ?, ?, ?, ?)`,
-        [amount, note, date, category, currency],
-    );
+    try {
+        await database.withTransactionAsync(async () => {
+            // 1. Check if wallet has enough balance
+            const wallet = await database.getFirstAsync<{ amount: number }>(
+                'SELECT amount FROM wallets WHERE id = ?',
+                [walletId],
+            );
+
+            if (!wallet) {
+                throw new Error('Wallet not found');
+            }
+
+            if (wallet.amount < amount) {
+                throw new Error('Insufficient balance in wallet');
+            }
+
+            // 2. Insert the expense
+            await database.runAsync(
+                `INSERT INTO expenses (amount, note, date, category, currency, walletId) VALUES (?, ?, ?, ?, ?, ?)`,
+                [amount, note, date, category, currency, walletId],
+            );
+
+            // 3. Update the wallet balance
+            await database.runAsync(
+                `UPDATE wallets SET amount = amount - ? WHERE id = ?`,
+                [amount, walletId],
+            );
+        });
+
+        return { success: true };
+    } catch (error: any) {
+        Alert.alert(
+            'Transaction Failed',
+            error.message || 'An unknown error occurred',
+        );
+        return { success: false, error };
+    }
 }
-
-// --- UPDATE OPERATIONS ---
 
 export async function updateWallet(
     id: number,
@@ -87,22 +121,36 @@ export async function updateWallet(
 
 export async function updateExpense(
     id: number,
-    amount: number,
+    newAmount: number,
     note: string,
     date: string,
     category: string,
     currency: string,
+    walletId: number,
 ) {
     const database = await getDB();
     if (!database) return;
 
-    return await database.runAsync(
-        `UPDATE expenses SET amount = ?, note = ?, date = ?, category = ?, currency = ? WHERE id = ?`,
-        [amount, note, date, category, currency, id],
+    const oldExpense: any = await database.getFirstAsync(
+        `SELECT amount FROM expenses WHERE id = ?`,
+        [id],
     );
-}
 
-// --- DELETE OPERATIONS ---
+    if (!oldExpense) return;
+
+    return await database.withTransactionAsync(async () => {
+        await database.runAsync(
+            `UPDATE expenses SET amount = ?, note = ?, date = ?, category = ?, currency = ? WHERE id = ?`,
+            [newAmount, note, date, category, currency, id],
+        );
+
+        const difference = newAmount - oldExpense.amount;
+        await database.runAsync(
+            `UPDATE wallets SET amount = amount - ? WHERE id = ?`,
+            [difference, walletId],
+        );
+    });
+}
 
 export async function deleteWallet(id: number) {
     const database = await getDB();
@@ -110,25 +158,53 @@ export async function deleteWallet(id: number) {
 
     return await database.runAsync(`DELETE FROM wallets WHERE id = ?`, [id]);
 }
+
 export async function deleteExpense(id: number) {
     const database = await getDB();
-    if (!database) return;
+    if (!database) {
+        Alert.alert('Error', 'Database not initialized');
+        return { success: false };
+    }
 
-    return await database.runAsync(`DELETE FROM expenses WHERE id = ?`, [id]);
+    try {
+        const expense = await database.getFirstAsync<{
+            amount: number;
+            walletId: number;
+        }>(`SELECT amount, walletId FROM expenses WHERE id = ?`, [id]);
+
+        if (!expense) {
+            Alert.alert('Error', 'Expense record not found');
+            return { success: false };
+        }
+
+        await database.withTransactionAsync(async () => {
+            await database.runAsync(`DELETE FROM expenses WHERE id = ?`, [id]);
+
+            await database.runAsync(
+                `UPDATE wallets SET amount = amount + ? WHERE id = ?`,
+                [expense.amount, expense.walletId],
+            );
+        });
+
+        return { success: true };
+    } catch (error: any) {
+        Alert.alert(
+            'Delete Failed',
+            error.message || 'An unexpected error occurred',
+        );
+        return { success: false, error };
+    }
 }
 
-// --- FETCH OPERATIONS ---
-
-export async function fetchWalletById(id: number) {
+export async function fetchWalletById(id: number): Promise<Wallet | null> {
     const database = await getDB();
-    if (!database) return null; // Or [] depending on your preference
+    if (!database) return null;
 
-    // Use '?' as a placeholder to prevent SQL injection
-    // The library safely escapes the value of 'id'
     return await database.getFirstAsync('SELECT * FROM wallets WHERE id = ?', [
         id,
     ]);
 }
+
 type Wallet = {
     id: number;
     name: string;
@@ -140,7 +216,6 @@ export async function fetchWallets(): Promise<Wallet[]> {
     const database = await getDB();
     if (!database) return [];
 
-    // Use getAllAsync to retrieve rows
     return await database.getAllAsync(`SELECT * FROM wallets`);
 }
 
@@ -148,15 +223,13 @@ export async function fetchFilteredExpenses(filters: {
     startDate?: string;
     endDate?: string;
     category?: string;
-    minAmount?: number;
 }) {
     const database = await getDB();
     if (!database) return [];
 
     let query = `SELECT * FROM expenses WHERE 1=1`;
-    const params: (string | number)[] = []; // Use explicit types
+    const params: (string | number)[] = [];
 
-    // 1. Check Date filters (ensure they aren't empty strings)
     if (filters.startDate && filters.startDate.length > 0) {
         query += ` AND date >= ?`;
         params.push(filters.startDate);
@@ -166,43 +239,25 @@ export async function fetchFilteredExpenses(filters: {
         params.push(filters.endDate);
     }
 
-    // 2. Check Category (ignore 'All')
     if (filters.category && filters.category !== 'All') {
         query += ` AND category = ?`;
         params.push(filters.category);
     }
 
-    // 3. Strict check for minAmount (avoids pushing NaN or undefined)
-    if (
-        filters.minAmount !== undefined &&
-        filters.minAmount !== null &&
-        !isNaN(filters.minAmount)
-    ) {
-        query += ` AND amount >= ?`;
-        params.push(filters.minAmount);
-    }
-
     query += ` ORDER BY date DESC`;
 
     try {
-        // This is where the NullPointerException usually happens
-        // We ensure 'params' only contains valid strings or numbers
         return await database.getAllAsync(query, params);
     } catch (error) {
-        console.error('SQLite Filter Error:', error);
-        return []; // Return empty list rather than crashing
+        Alert.alert(`SQLite Filter Error: ${error}`);
+        return [];
     }
 }
 
-/**
- * Calculates the total expenses for a specific date.
- * @param date - Format: YYYY-MM-DD
- */
 export async function getDailyTotal(date: string): Promise<number> {
     const database = await getDB();
     if (!database) return 0;
 
-    // We use ROUND to mitigate floating point errors (e.g., 1.1 + 2.2 = 3.30000003)
     const result: any = await database.getFirstAsync(
         `SELECT ROUND(SUM(amount), 2) as total FROM expenses WHERE date = ?`,
         [date],
@@ -211,15 +266,10 @@ export async function getDailyTotal(date: string): Promise<number> {
     return result?.total || 0;
 }
 
-/**
- * Calculates the total expenses for a specific month.
- * @param monthPrefix - Format: YYYY-MM (e.g., "2023-10")
- */
 export async function getMonthlyTotal(monthPrefix: string): Promise<number> {
     const database = await getDB();
     if (!database) return 0;
 
-    // Uses the LIKE operator to match any date starting with "YYYY-MM"
     const result: any = await database.getFirstAsync(
         `SELECT ROUND(SUM(amount), 2) as total FROM expenses WHERE date LIKE ?`,
         [`${monthPrefix}%`],

@@ -1,7 +1,7 @@
 import { useRefresh } from '@/hooks/useRefresh';
 import { format } from 'date-fns';
-import { Link } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { Link, useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
   Pressable,
   RefreshControl,
@@ -75,9 +75,11 @@ export default function Home() {
 
   const { refreshing, onRefresh } = useRefresh(loadData);
 
-  useEffect(() => {
-    loadData();
-  }, [filterCategory, minAmount]);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [filterCategory, minAmount]),
+  );
 
   const resetFilters = () => {
     setFilterCategory('All');
@@ -147,21 +149,6 @@ export default function Home() {
               </Chip>
             ))}
           </ScrollView>
-
-          {/* <TextInput
-            placeholder="Min Amount"
-            value={minAmount}
-            onChangeText={setMinAmount}
-            keyboardType="numeric"
-            mode="outlined"
-            dense
-            style={styles.minAmountInput}
-            right={
-              minAmount ? (
-                <TextInput.Icon icon="close" onPress={() => setMinAmount('')} />
-              ) : null
-            }
-          /> */}
         </View>
 
         <MonthlyChart expenses={expenses} />

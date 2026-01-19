@@ -1,7 +1,7 @@
 import { deleteWallet, fetchWallets } from '@/lib/db';
 import { formatMoney } from '@/utils/formatMoney';
-import { Link } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import { Link, useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -36,9 +36,11 @@ const Wallets = () => {
     setRefreshing(false);
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, []),
+  );
 
   const handleDelete = async (id: number) => {
     Alert.alert(
@@ -54,7 +56,7 @@ const Wallets = () => {
             loadData(); // Refresh all state
           },
         },
-      ]
+      ],
     );
   };
 

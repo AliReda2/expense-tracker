@@ -1,8 +1,8 @@
 import { fetchWallets, initDB } from '@/lib/db';
 import { formatMoney } from '@/utils/formatMoney';
-import { Link } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Link, useFocusEffect } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, Text, TouchableOpacity, View } from 'react-native';
 
 type Wallet = {
   id: number;
@@ -21,14 +21,16 @@ const WalletsContainer = ({ refreshing }: { refreshing?: boolean }) => {
       // Ensure data is an array, otherwise fallback to empty array
       setWallets(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Failed to fetch wallets:', error);
+      Alert.alert(`Failed to fetch wallets: ${error}`);
       setWallets([]); // Fallback on error
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, []),
+  );
 
   useEffect(() => {
     if (refreshing) {

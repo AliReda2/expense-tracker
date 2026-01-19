@@ -13,16 +13,22 @@ import {
 } from 'react-native';
 import { Button, TextInput } from 'react-native-paper';
 
+type Wallet = {
+  id: number;
+  name: string;
+  amount: number;
+  currency: string;
+};
+
 const EditWallet = () => {
   const router = useRouter();
-  const param = useLocalSearchParams<{ id: string }>(); // 3. Correctly get the ID param
+  const param = useLocalSearchParams<{ id: string }>();
   const id = parseFloat(param.id);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('USD');
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
 
-  // 4. Use useEffect to call loadData when the component mounts
   useEffect(() => {
     if (id) {
       loadData();
@@ -31,15 +37,14 @@ const EditWallet = () => {
 
   const loadData = async () => {
     try {
-      const data = await fetchWalletById(id);
+      const data: Wallet | null = await fetchWalletById(id);
       if (data) {
         setName(data.name);
-        setAmount(data.amount.toString()); // TextInput requires a string
+        setAmount(data.amount.toString());
         setCurrency(data.currency || 'USD');
       }
     } catch (error) {
-      console.error('Failed to load wallet:', error);
-      Alert.alert('Error', 'Could not load wallet details.');
+      Alert.alert('Could not load wallet details.', `Error: ${error}`);
     }
   };
 
@@ -61,12 +66,10 @@ const EditWallet = () => {
     }
 
     try {
-      // 5. id is a string from params, updateWallet usually expects the ID first
       await updateWallet(id, name, numAmount, currency);
       router.back();
     } catch (error) {
-      console.error('Save failed', error);
-      Alert.alert('Error', 'Failed to save wallet changes.');
+      Alert.alert('Failed to save wallet changes.', `Error: ${error}`);
     }
   };
 
@@ -74,12 +77,19 @@ const EditWallet = () => {
     <View style={styles.container}>
       <TextInput
         label="Wallet Name"
-        value={name} // 6. Use the name state directly
+        value={name}
         onChangeText={setName}
         mode="outlined"
         style={styles.input}
         outlineColor="#ccc"
         activeOutlineColor="#ff8c00"
+        textColor="#000000"
+        theme={{
+          colors: {
+            onSurfaceVariant: '#9b9b9b',
+            primary: '#ff8c00',
+          },
+        }}
       />
 
       <View style={styles.row}>
@@ -100,6 +110,13 @@ const EditWallet = () => {
           style={[styles.input, { flex: 1 }]}
           outlineColor="#ccc"
           activeOutlineColor="#ff8c00"
+          textColor="#000000"
+          theme={{
+            colors: {
+              onSurfaceVariant: '#9b9b9b', // Colors the label when not focused
+              primary: '#ff8c00',
+            },
+          }}
         />
       </View>
 
@@ -171,7 +188,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#333',
   },
-  input: { marginBottom: 15 },
+  input: { marginBottom: 15, backgroundColor: '#fff' },
   button: { marginTop: 10, backgroundColor: '#ff8c00', paddingVertical: 5 },
   modalOverlay: {
     flex: 1,

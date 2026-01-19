@@ -2,8 +2,8 @@ import { SwipeableExpenseRow } from '@/components/SwipeableExpenseRow';
 import { useRefresh } from '@/hooks/useRefresh';
 import { deleteExpense, fetchFilteredExpenses } from '@/lib/db';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -13,7 +13,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Chip, TextInput } from 'react-native-paper';
+import { Chip } from 'react-native-paper';
 
 type Expense = {
   id: number;
@@ -29,7 +29,6 @@ const ViewExpenses = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
 
   const [filterCategory, setFilterCategory] = useState('All');
-  const [minAmount, setMinAmount] = useState('');
 
   const categories = [
     'All',
@@ -42,17 +41,8 @@ const ViewExpenses = () => {
   ];
 
   const loadData = async () => {
-    const cleanMinInput = minAmount.trim() === '' ? undefined : minAmount;
-
-    const parsedAmount = cleanMinInput ? parseFloat(cleanMinInput) : undefined;
-
     const data = await fetchFilteredExpenses({
       category: filterCategory,
-      // 3. Final validation check
-      minAmount:
-        typeof parsedAmount === 'number' && !isNaN(parsedAmount)
-          ? parsedAmount
-          : undefined,
     });
 
     setExpenses(data as Expense[]);
@@ -60,9 +50,12 @@ const ViewExpenses = () => {
 
   const { refreshing, onRefresh } = useRefresh(loadData);
 
-  useEffect(() => {
-    loadData();
-  }, [filterCategory, minAmount]);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [filterCategory]),
+  );
+
   const handleDelete = async (id: number) => {
     Alert.alert(
       'Delete Expense',
@@ -77,7 +70,7 @@ const ViewExpenses = () => {
             loadData(); // Refresh all state
           },
         },
-      ]
+      ],
     );
   };
   return (
@@ -99,21 +92,6 @@ const ViewExpenses = () => {
             </Chip>
           ))}
         </ScrollView>
-
-        <TextInput
-          placeholder="Min Amount"
-          value={minAmount}
-          onChangeText={setMinAmount}
-          keyboardType="numeric"
-          mode="outlined"
-          dense
-          style={styles.minAmountInput}
-          right={
-            minAmount ? (
-              <TextInput.Icon icon="close" onPress={() => setMinAmount('')} />
-            ) : null
-          }
-        />
       </View>
       <FlatList
         data={expenses}
@@ -136,7 +114,7 @@ const ViewExpenses = () => {
             />
             <Text style={styles.emptyTitle}>No Expenses Found</Text>
             <Text style={styles.emptySubtitle}>
-              {filterCategory === 'All' && !minAmount
+              {filterCategory === 'All'
                 ? 'Start tracking your expenses to see them here'
                 : 'Try adjusting your filters'}
             </Text>

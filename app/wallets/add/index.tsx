@@ -40,8 +40,7 @@ const AddWallet = () => {
       await insertWallet(name, numAmount, currency);
       router.back();
     } catch (error) {
-      console.error('Save failed', error);
-      Alert.alert('Error', 'Wallet name must be unique');
+      Alert.alert('Wallet name must be unique', `Error: ${error}`);
     }
   };
 
@@ -55,10 +54,11 @@ const AddWallet = () => {
         style={styles.input}
         outlineColor="#ccc"
         activeOutlineColor="#ff8c00"
+        textColor="#000000"
         theme={{
           colors: {
             onSurfaceVariant: '#9b9b9b', // Colors the label when not focused
-            primary: '#ff8c00', // Colors the label/outline when focused
+            primary: '#ff8c00',
           },
         }}
       />
@@ -82,10 +82,11 @@ const AddWallet = () => {
           style={[styles.input, { flex: 1 }]}
           outlineColor="#ccc"
           activeOutlineColor="#ff8c00"
+          textColor="#000000"
           theme={{
             colors: {
               onSurfaceVariant: '#9b9b9b', // Colors the label when not focused
-              primary: '#ff8c00', // Colors the label/outline when focused
+              primary: '#ff8c00',
             },
           }}
         />
