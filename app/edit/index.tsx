@@ -1,5 +1,5 @@
 import { CURRENCIES } from '@/constants/currencies';
-import { fetchWallets, insertExpense } from '@/lib/db';
+import { fetchWallets, updateExpense } from '@/lib/db';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
@@ -12,10 +12,11 @@ type Wallet = {
   currency: string;
 };
 
-// Screen dedicated to adding a new expense
-export default function AddExpense() {
+// Screen dedicated to editing an existing expense
+export default function EditExpense() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const isEditing = true;
 
   const categories = [
     'Food',
@@ -52,17 +53,22 @@ export default function AddExpense() {
       const result = await fetchWallets();
       setWallets(result);
 
-      // For the add screen, default to the first wallet if none is selected
-      if (!selectedWalletId && result.length > 0) {
+      // For the edit screen, do not override an explicitly selected wallet
+      if (!isEditing && !selectedWalletId && result.length > 0) {
         setSelectedWalletId(result[0].id);
       }
     }
     loadWallets();
   }, []);
 
-  // --- SAVE HANDLER ---
-  const handleSave = async () => {
+  // --- UPDATE HANDLER ---
+  const handleUpdate = async () => {
     const numAmount = parseFloat(amount);
+
+    if (!params.id) {
+      Alert.alert('Missing Expense', 'Cannot update expense: missing id.');
+      return;
+    }
 
     // Validation
     if (isNaN(numAmount) || numAmount <= 0) {
@@ -77,14 +83,14 @@ export default function AddExpense() {
       return;
     }
 
-    const today = new Date().toISOString().split('T')[0];
-    await insertExpense(
+    await updateExpense(
+      Number(params.id),
       numAmount,
       note,
-      today,
+      (params.date as string) ?? new Date().toISOString().split('T')[0],
       category,
-      selectedWalletId,
       currency,
+      selectedWalletId,
     );
 
     router.back();
@@ -187,11 +193,11 @@ export default function AddExpense() {
 
       <Button
         mode="contained"
-        onPress={handleSave}
+        onPress={handleUpdate}
         style={styles.button}
         buttonColor="#ff8c00"
       >
-        Save
+        Update
       </Button>
     </View>
   );

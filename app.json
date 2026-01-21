@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "expense-tracker",
+    "name": "Expense Tracker",
     "slug": "expense-tracker",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/play_store_512.png",
     "scheme": "expensetracker",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,10 +13,9 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/expense_tracker_foreground.png",
+        "backgroundImage": "./assets/images/expense_tracker_background.png",
+        "monochromeImage": "./assets/images/expense_tracker_monochrome.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -24,7 +23,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/expense_tracker.png"
     },
     "plugins": [
       "expo-router",

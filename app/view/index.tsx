@@ -21,6 +21,8 @@ type Expense = {
   note: string;
   date: string;
   category: string;
+  walletId: number | null;
+  currency: string;
 };
 
 const ViewExpenses = () => {
@@ -121,27 +123,29 @@ const ViewExpenses = () => {
           </View>
         }
         renderItem={({ item }) => (
-          <SwipeableExpenseRow
-            item={item}
-            onDelete={() => handleDelete(item.id)}
-            onPress={() =>
-              router.push({
-                pathname: '/add',
-                params: {
-                  id: item.id,
-                  amount: item.amount.toString(),
-                  note: item.note,
-                  date: item.date,
-                  category: item.category,
-                },
-              })
-            }
-          />
-        )}
-      />
-    </View>
-  );
-};
+            <SwipeableExpenseRow
+              item={item}
+              onDelete={() => handleDelete(item.id)}
+              onPress={() =>
+                router.push({
+                  pathname: '/edit',
+                  params: {
+                    id: item.id,
+                    amount: item.amount.toString(),
+                    note: item.note,
+                    date: item.date,
+                    category: item.category,
+                    walletId: item.walletId ?? undefined,
+                    currency: item.currency,
+                  },
+                })
+              }
+            />
+          )}
+        />
+      </View>
+    );
+  };
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#f8f9fa' },
