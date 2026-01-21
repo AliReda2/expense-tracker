@@ -1,7 +1,11 @@
+import { convertToUSD, CURRENCIES } from '@/constants/currencies';
 import * as SQLite from 'expo-sqlite';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 
 let db: SQLite.SQLiteDatabase | null = null;
+
+// 1. Add this variable to track initialization status
+let initPromise: Promise<void> | null = null;
 
 export async function getDB() {
     if (Platform.OS === 'web') return null;
@@ -11,7 +15,10 @@ export async function getDB() {
     return db;
 }
 
-// Debug helpers: log every SQL statement and guard against null DB handles.
+// Helper to clean parameters before they hit the native bridge
+const sanitizeParams = (params: (string | number | null | undefined)[]) =>
+    params.map((p) => (p === undefined ? null : p));
+
 async function execAsyncSafe(label: string, sql: string) {
     const database = await getDB();
     if (!database) {
@@ -21,11 +28,13 @@ async function execAsyncSafe(label: string, sql: string) {
         return;
     }
     try {
-        console.log(`[DB] execAsync (${label}) SQL:`); // Print SQL separately to avoid huge logs
+        console.log(`[DB] execAsync (${label}) SQL:`);
         console.log(sql);
         return await database.execAsync(sql);
     } catch (error) {
         console.error(`[DB] execAsync (${label}) failed:`, error);
+        // We don't throw here to prevent the UI from crashing,
+        // but you can keep the throw if you want the caller to handle it.
         throw error;
     }
 }
@@ -33,7 +42,7 @@ async function execAsyncSafe(label: string, sql: string) {
 async function runAsyncSafe(
     label: string,
     sql: string,
-    params: (string | number | null)[] = [],
+    params: (string | number | null | undefined)[] = [],
 ) {
     const database = await getDB();
     if (!database) {
@@ -42,9 +51,12 @@ async function runAsyncSafe(
         );
         return;
     }
+
+    const cleanParams = sanitizeParams(params);
+
     try {
-        console.log(`[DB] runAsync (${label}) SQL:`, sql, 'params:', params);
-        return await database.runAsync(sql, params);
+        console.log(`[DB] runAsync (${label}) SQL:`, sql, 'params:', cleanParams);
+        return await database.runAsync(sql, cleanParams);
     } catch (error) {
         console.error(`[DB] runAsync (${label}) failed:`, error);
         throw error;
@@ -54,18 +66,24 @@ async function runAsyncSafe(
 async function getFirstAsyncSafe<T = any>(
     label: string,
     sql: string,
-    params: (string | number | null)[] = [],
+    params: (string | number | null | undefined)[] = [],
 ): Promise<T | null> {
     const database = await getDB();
     if (!database) {
-        console.warn(
-            `[DB] ${label}: database is null, skipping getFirstAsync. Platform=${Platform.OS}`,
-        );
+        console.warn(`[DB] ${label}: database is null. Platform=${Platform.OS}`);
         return null;
     }
+
+    const sanitizedParams = sanitizeParams(params);
+
     try {
-        console.log(`[DB] getFirstAsync (${label}) SQL:`, sql, 'params:', params);
-        return await database.getFirstAsync<T>(sql, params);
+        console.log(
+            `[DB] getFirstAsync (${label}) SQL:`,
+            sql,
+            'params:',
+            sanitizedParams,
+        );
+        return await database.getFirstAsync<T>(sql, sanitizedParams);
     } catch (error) {
         console.error(`[DB] getFirstAsync (${label}) failed:`, error);
         throw error;
@@ -75,7 +93,7 @@ async function getFirstAsyncSafe<T = any>(
 async function getAllAsyncSafe<T = any>(
     label: string,
     sql: string,
-    params: (string | number | null)[] = [],
+    params: (string | number | null | undefined)[] = [],
 ): Promise<T[]> {
     const database = await getDB();
     if (!database) {
@@ -84,9 +102,17 @@ async function getAllAsyncSafe<T = any>(
         );
         return [];
     }
+
+    const cleanParams = sanitizeParams(params);
+
     try {
-        console.log(`[DB] getAllAsync (${label}) SQL:`, sql, 'params:', params);
-        return await database.getAllAsync<T>(sql, params);
+        console.log(
+            `[DB] getAllAsync (${label}) SQL:`,
+            sql,
+            'params:',
+            cleanParams,
+        );
+        return await database.getAllAsync<T>(sql, cleanParams);
     } catch (error) {
         console.error(`[DB] getAllAsync (${label}) failed:`, error);
         throw error;
@@ -94,33 +120,107 @@ async function getAllAsyncSafe<T = any>(
 }
 
 export async function initDB() {
-    await execAsyncSafe(
-        'initDB:create_expenses',
-        `
-  CREATE TABLE IF NOT EXISTS expenses (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    amount REAL NOT NULL,
-    note TEXT NOT NULL,
-    date TEXT NOT NULL,
-    category TEXT DEFAULT 'General',
-    currency TEXT DEFAULT 'USD',
-    walletId INTEGER,
-    FOREIGN KEY (walletId) REFERENCES wallets (id)
-  );
-`,
-    );
+    // 2. Prevent double execution
+    if (initPromise) {
+        return initPromise;
+    }
 
-    await execAsyncSafe(
-        'initDB:create_wallets',
-        `
-    CREATE TABLE IF NOT EXISTS wallets (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
-      amount REAL NOT NULL,
-      currency TEXT DEFAULT 'USD' NOT NULL 
-    );
-  `,
-    );
+    initPromise = (async () => {
+        // 3. Ensure tables exist first
+        await execAsyncSafe(
+            'initDB:create_wallets',
+            `CREATE TABLE IF NOT EXISTS wallets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                amount REAL NOT NULL,
+                dollarAmount REAL NOT NULL,
+                currency TEXT DEFAULT 'USD' NOT NULL 
+            );`,
+        );
+
+        await execAsyncSafe(
+            'initDB:create_expenses',
+            `CREATE TABLE IF NOT EXISTS expenses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                amount REAL NOT NULL,
+                dollarAmount REAL NOT NULL,
+                note TEXT NOT NULL,
+                date TEXT NOT NULL,
+                walletId INTEGER,
+                FOREIGN KEY (walletId) REFERENCES wallets (id)
+            );`,
+        );
+
+        // 4. Run Migrations
+        await migrateTableColumns();
+    })();
+
+    return initPromise;
+}
+
+async function migrateTableColumns() {
+    const database = await getDB();
+    if (!database) return;
+
+    try {
+        // --- Expenses Table Migrations ---
+        const expenseColumns = await getAllAsyncSafe(
+            'migrate:check_expenses',
+            'PRAGMA table_info(expenses)',
+        );
+        const expenseColNames = expenseColumns.map((col: any) => col.name);
+
+        const expenseMigrations = [
+            {
+                name: 'category',
+                sql: "ALTER TABLE expenses ADD COLUMN category TEXT DEFAULT 'General';",
+            },
+            {
+                name: 'currency',
+                sql: "ALTER TABLE expenses ADD COLUMN currency TEXT DEFAULT 'USD';",
+            },
+            {
+                name: 'dollarAmount',
+                sql: 'ALTER TABLE expenses ADD COLUMN dollarAmount REAL DEFAULT 0.0 NOT NULL;',
+            },
+        ];
+
+        for (const mig of expenseMigrations) {
+            if (!expenseColNames.includes(mig.name)) {
+                console.log(`[DB] Migrating: Adding ${mig.name} to expenses`);
+                await database.execAsync(mig.sql);
+            }
+        }
+
+        // --- Wallets Table Migrations ---
+        const walletColumns = await getAllAsyncSafe(
+            'migrate:check_wallets',
+            'PRAGMA table_info(wallets)',
+        );
+        const walletColNames = walletColumns.map((col: any) => col.name);
+
+        const walletMigrations = [
+            {
+                name: 'currency',
+                sql: "ALTER TABLE wallets ADD COLUMN currency TEXT DEFAULT 'USD' NOT NULL;",
+            },
+            {
+                name: 'dollarAmount',
+                sql: 'ALTER TABLE wallets ADD COLUMN dollarAmount REAL DEFAULT 0.0 NOT NULL;',
+            },
+        ];
+
+        for (const mig of walletMigrations) {
+            if (!walletColNames.includes(mig.name)) {
+                console.log(`[DB] Migrating: Adding ${mig.name} to wallets`);
+                await database.execAsync(mig.sql);
+            }
+        }
+
+        console.log('[DB] Database schema is up to date.');
+    } catch (error) {
+        console.error('[DB] Migration failed:', error);
+    }
 }
 
 export async function insertWallet(
@@ -128,10 +228,11 @@ export async function insertWallet(
     amount: number,
     currency: string,
 ) {
+    const dollarAmount = await convertToUSD(amount, currency);
     return await runAsyncSafe(
         'insertWallet',
-        `INSERT INTO wallets (name,amount,currency) VALUES (?, ?,?)`,
-        [name, amount, currency],
+        `INSERT INTO wallets (name, amount, currency, dollarAmount) VALUES (?, ?, ?, ?)`,
+        [name, amount, currency, dollarAmount],
     );
 }
 
@@ -141,52 +242,68 @@ export async function insertExpense(
     date: string,
     category: string,
     walletId: number,
-    currency: string = 'USD',
+    expenseCurrency: string = 'USD', // The currency of the transaction
 ) {
     const database = await getDB();
     if (!database) {
-        throw new Error('Database not initialized');
+        console.error('[DB] insertExpense: Database not initialized');
+        return { success: false };
     }
 
     try {
+        // 1. Get the Dollar equivalent for the expense (for global reports)
+        const expenseInUSD = await convertToUSD(amount, expenseCurrency);
+
         await database.withTransactionAsync(async () => {
-            // 1. Check if wallet has enough balance
-            const wallet = await getFirstAsyncSafe<{ amount: number }>(
+            // 2. Fetch the wallet details (needed to check currency and balance)
+            const wallet = await getFirstAsyncSafe<{
+                amount: number;
+                currency: string;
+            }>(
                 'insertExpense:select_wallet',
-                'SELECT amount FROM wallets WHERE id = ?',
+                'SELECT amount, currency FROM wallets WHERE id = ?',
                 [walletId],
             );
 
-            if (!wallet) {
-                throw new Error('Wallet not found');
+            if (!wallet) throw new Error('Wallet not found');
+
+            // 3. Convert the expense amount into the WALLET'S local currency
+            // Formula: (Amount in USD) * (Wallet's rate to USD)
+            const walletCurrencyObj = CURRENCIES.find(
+                (c) => c.code === wallet.currency,
+            );
+            if (!walletCurrencyObj)
+                throw new Error(`Unknown wallet currency: ${wallet.currency}`);
+
+            const amountInWalletCurrency =
+                expenseInUSD * walletCurrencyObj.rateToDollar;
+
+            // 4. Validate Balance using the wallet's currency units
+            if (wallet.amount < amountInWalletCurrency) {
+                throw new Error(
+                    `Insufficient balance. Need ${amountInWalletCurrency.toLocaleString()} ${wallet.currency}`,
+                );
             }
 
-            if (wallet.amount < amount) {
-                throw new Error('Insufficient balance in wallet');
-            }
-
-            // 2. Insert the expense
+            // 5. Insert Expense (Save the original spent amount and the USD normalized amount)
             await runAsyncSafe(
                 'insertExpense:insert_row',
-                `INSERT INTO expenses (amount, note, date, category, currency, walletId) VALUES (?, ?, ?, ?, ?, ?)`,
-                [amount, note, date, category, currency, walletId],
+                `INSERT INTO expenses (amount, dollarAmount, note, date, category, currency, walletId) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [amount, expenseInUSD, note, date, category, expenseCurrency, walletId],
             );
 
-            // 3. Update the wallet balance
+            // 6. Update Wallet: Deduct the amount converted to the wallet's currency
             await runAsyncSafe(
                 'insertExpense:update_wallet',
-                `UPDATE wallets SET amount = amount - ? WHERE id = ?`,
-                [amount, walletId],
+                `UPDATE wallets SET amount = amount - ?, dollarAmount = dollarAmount - ? WHERE id = ?`,
+                [amountInWalletCurrency, expenseInUSD, walletId],
             );
         });
 
         return { success: true };
     } catch (error: any) {
-        Alert.alert(
-            'Transaction Failed',
-            error.message || 'An unknown error occurred',
-        );
-        return { success: false, error };
+        console.error('[DB] Transaction Failed:', error.message || error);
+        return { success: false, error: error.message };
     }
 }
 
@@ -196,10 +313,12 @@ export async function updateWallet(
     amount: number,
     currency: string,
 ) {
+    const dollarAmount = await convertToUSD(amount, currency);
+
     return await runAsyncSafe(
         'updateWallet',
-        `UPDATE wallets SET amount = ?, name = ?, currency = ? WHERE id = ?`,
-        [amount, name, currency, id],
+        `UPDATE wallets SET amount = ?, dollarAmount = ?, name = ?, currency = ? WHERE id = ?`,
+        [amount, dollarAmount, name, currency, id],
     );
 }
 
@@ -209,131 +328,138 @@ export async function updateExpense(
     note: string,
     date: string,
     category: string,
-    currency: string,
+    expenseCurrency: string,
     newWalletId: number,
 ) {
     const database = await getDB();
-    if (!database) return;
-
-    const oldExpense = await getFirstAsyncSafe<{
-        amount: number;
-        walletId: number | null;
-    }>(
-        'updateExpense:select_old_expense',
-        `SELECT amount, walletId FROM expenses WHERE id = ?`,
-        [id],
-    );
-
-    if (!oldExpense) {
-        console.warn(`[DB] updateExpense: no existing expense found for id=${id}`);
-        return;
+    if (!database) {
+        console.error('[DB] updateExpense: Database not initialized');
+        return { success: false };
     }
 
-    const oldAmount = oldExpense.amount;
-    const oldWalletId = oldExpense.walletId;
-
     try {
+        // 1. Fetch old expense AND the currency of the old wallet
+        const oldData = await getFirstAsyncSafe<{
+            amount: number;
+            dollarAmount: number;
+            walletId: number;
+            walletCurrency: string;
+        }>(
+            'updateExpense:select_old_data',
+            `SELECT e.amount, e.dollarAmount, e.walletId, w.currency as walletCurrency 
+             FROM expenses e 
+             JOIN wallets w ON e.walletId = w.id 
+             WHERE e.id = ?`,
+            [id],
+        );
+
+        if (!oldData) throw new Error('Existing expense or wallet not found');
+
+        // 2. Prepare new values
+        const newDollarAmount = await convertToUSD(newAmount, expenseCurrency);
+
         await database.withTransactionAsync(async () => {
-            // For now we require an associated wallet for every expense
-            if (!newWalletId) {
-                throw new Error('A wallet is required for this expense');
-            }
+            // CASE 1: WALLET REMAINS THE SAME
+            if (oldData.walletId === newWalletId) {
+                const walletRate =
+                    CURRENCIES.find((c) => c.code === oldData.walletCurrency)
+                        ?.rateToDollar || 1;
 
-            // Case 1: expense stays in the same wallet -> just adjust the difference
-            if (oldWalletId === newWalletId) {
-                const difference = newAmount - oldAmount;
+                // Calculate difference in wallet's local currency
+                const dollarDiff = newDollarAmount - oldData.dollarAmount;
+                const localAmountDiff = dollarDiff * walletRate;
 
-                // If we are increasing the expense, ensure the wallet has enough balance
-                if (difference > 0) {
+                // Check balance if the expense increased
+                if (localAmountDiff > 0) {
                     const wallet = await getFirstAsyncSafe<{ amount: number }>(
-                        'updateExpense:select_same_wallet',
+                        'check_bal',
                         'SELECT amount FROM wallets WHERE id = ?',
                         [newWalletId],
                     );
-
-                    if (!wallet) {
-                        throw new Error('Wallet not found');
-                    }
-
-                    if (wallet.amount < difference) {
+                    if (!wallet || wallet.amount < localAmountDiff)
                         throw new Error('Insufficient balance in wallet');
-                    }
                 }
 
                 await runAsyncSafe(
-                    'updateExpense:update_row_same_wallet',
-                    `UPDATE expenses SET amount = ?, note = ?, date = ?, category = ?, currency = ? WHERE id = ?`,
-                    [newAmount, note, date, category, currency, id],
+                    'updateExpense:row_same_wallet',
+                    `UPDATE expenses SET amount = ?, dollarAmount = ?, note = ?, date = ?, category = ?, currency = ? WHERE id = ?`,
+                    [
+                        newAmount,
+                        newDollarAmount,
+                        note,
+                        date,
+                        category,
+                        expenseCurrency,
+                        id,
+                    ],
                 );
 
-                if (difference !== 0) {
-                    await runAsyncSafe(
-                        'updateExpense:update_wallet_same_wallet',
-                        `UPDATE wallets SET amount = amount - ? WHERE id = ?`,
-                        [difference, newWalletId],
-                    );
-                }
-
-                return;
-            }
-
-            // Case 2: moving the expense from one wallet to another
-            const oldWallet =
-                oldWalletId !== null
-                    ? await getFirstAsyncSafe<{ amount: number }>(
-                          'updateExpense:select_old_wallet',
-                          'SELECT amount FROM wallets WHERE id = ?',
-                          [oldWalletId],
-                      )
-                    : null;
-
-            const newWallet = await getFirstAsyncSafe<{ amount: number }>(
-                'updateExpense:select_new_wallet',
-                'SELECT amount FROM wallets WHERE id = ?',
-                [newWalletId],
-            );
-
-            if (oldWalletId !== null && !oldWallet) {
-                throw new Error('Original wallet not found');
-            }
-            if (!newWallet) {
-                throw new Error('New wallet not found');
-            }
-
-            // Ensure the new wallet has enough balance for the full new amount
-            if (newWallet.amount < newAmount) {
-                throw new Error('Insufficient balance in new wallet');
-            }
-
-            // 1. Update the expense row to point to the new wallet
-            await runAsyncSafe(
-                'updateExpense:update_row_new_wallet',
-                `UPDATE expenses SET amount = ?, note = ?, date = ?, category = ?, currency = ?, walletId = ? WHERE id = ?`,
-                [newAmount, note, date, category, currency, newWalletId, id],
-            );
-
-            // 2. Re-add the old amount to the old wallet (if it existed)
-            if (oldWalletId !== null) {
                 await runAsyncSafe(
-                    'updateExpense:credit_old_wallet',
-                    `UPDATE wallets SET amount = amount + ? WHERE id = ?`,
-                    [oldAmount, oldWalletId],
+                    'updateExpense:wallet_same_wallet',
+                    `UPDATE wallets SET amount = amount - ?, dollarAmount = dollarAmount - ? WHERE id = ?`,
+                    [localAmountDiff, dollarDiff, newWalletId],
+                );
+            } else {
+                // CASE 2: CHANGING WALLETS
+                const newWallet = await getFirstAsyncSafe<{
+                    amount: number;
+                    currency: string;
+                }>(
+                    'select_new_wallet',
+                    'SELECT amount, currency FROM wallets WHERE id = ?',
+                    [newWalletId],
+                );
+                if (!newWallet) throw new Error('New wallet not found');
+
+                const oldWalletRate =
+                    CURRENCIES.find((c) => c.code === oldData.walletCurrency)
+                        ?.rateToDollar || 1;
+                const newWalletRate =
+                    CURRENCIES.find((c) => c.code === newWallet.currency)?.rateToDollar ||
+                    1;
+
+                const refundAmountLocal = oldData.dollarAmount * oldWalletRate;
+                const deductAmountLocal = newDollarAmount * newWalletRate;
+
+                if (newWallet.amount < deductAmountLocal)
+                    throw new Error('Insufficient balance in new wallet');
+
+                // Update Expense Row
+                await runAsyncSafe(
+                    'updateExpense:row_new_wallet',
+                    `UPDATE expenses SET amount = ?, dollarAmount = ?, note = ?, date = ?, category = ?, currency = ?, walletId = ? WHERE id = ?`,
+                    [
+                        newAmount,
+                        newDollarAmount,
+                        note,
+                        date,
+                        category,
+                        expenseCurrency,
+                        newWalletId,
+                        id,
+                    ],
+                );
+
+                // Refund Old Wallet
+                await runAsyncSafe(
+                    'updateExpense:refund_old',
+                    `UPDATE wallets SET amount = amount + ?, dollarAmount = dollarAmount + ? WHERE id = ?`,
+                    [refundAmountLocal, oldData.dollarAmount, oldData.walletId],
+                );
+
+                // Deduct New Wallet
+                await runAsyncSafe(
+                    'updateExpense:deduct_new',
+                    `UPDATE wallets SET amount = amount - ?, dollarAmount = dollarAmount - ? WHERE id = ?`,
+                    [deductAmountLocal, newDollarAmount, newWalletId],
                 );
             }
-
-            // 3. Deduct the new amount from the new wallet
-            await runAsyncSafe(
-                'updateExpense:debit_new_wallet',
-                `UPDATE wallets SET amount = amount - ? WHERE id = ?`,
-                [newAmount, newWalletId],
-            );
         });
+
+        return { success: true };
     } catch (error: any) {
-        Alert.alert(
-            'Transaction Failed',
-            error.message || 'An unknown error occurred',
-        );
-        return { success: false, error };
+        console.error('[DB] Update Failed:', error.message || error);
+        return { success: false, error: error.message };
     }
 }
 
@@ -348,46 +474,67 @@ export async function deleteWallet(id: number) {
 export async function deleteExpense(id: number) {
     const database = await getDB();
     if (!database) {
-        Alert.alert('Error', 'Database not initialized');
+        console.error('[DB] deleteExpense: Database not initialized');
         return { success: false };
     }
 
     try {
-        const expense = await getFirstAsyncSafe<{
-            amount: number;
+        // 1. Fetch the expense AND the wallet's currency info
+        // We join with wallets to know how to convert the USD back to the wallet's local units
+        const data = await getFirstAsyncSafe<{
+            amount: number; // The original amount spent (e.g., 10 USD)
+            dollarAmount: number; // The USD equivalent (e.g., 10.00)
             walletId: number;
+            walletCurrency: string;
         }>(
-            'deleteExpense:select_expense',
-            `SELECT amount, walletId FROM expenses WHERE id = ?`,
+            'deleteExpense:select_expense_with_wallet',
+            `SELECT e.amount, e.dollarAmount, e.walletId, w.currency as walletCurrency 
+             FROM expenses e 
+             JOIN wallets w ON e.walletId = w.id 
+             WHERE e.id = ?`,
             [id],
         );
 
-        if (!expense) {
-            Alert.alert('Error', 'Expense record not found');
+        if (!data) {
+            console.error(
+                '[DB] deleteExpense: Expense record or associated wallet not found',
+            );
             return { success: false };
         }
 
+        // 2. Find the rate for the wallet's currency
+        const walletCurrencyObj = CURRENCIES.find(
+            (c) => c.code === data.walletCurrency,
+        );
+        if (!walletCurrencyObj)
+            throw new Error(`Unknown wallet currency: ${data.walletCurrency}`);
+
+        // 3. Calculate how much to refund in the wallet's local currency
+        // We use the dollarAmount (the source of truth) multiplied by the wallet's rate
+        const refundAmountLocal =
+            data.dollarAmount * walletCurrencyObj.rateToDollar;
+
         await database.withTransactionAsync(async () => {
+            // 4. Delete the expense
             await runAsyncSafe(
                 'deleteExpense:delete_row',
                 `DELETE FROM expenses WHERE id = ?`,
                 [id],
             );
 
+            // 5. Refund the wallet
+            // We refund the calculated local amount and the exact dollarAmount
             await runAsyncSafe(
                 'deleteExpense:update_wallet',
-                `UPDATE wallets SET amount = amount + ? WHERE id = ?`,
-                [expense.amount, expense.walletId],
+                `UPDATE wallets SET amount = amount + ?, dollarAmount = dollarAmount + ? WHERE id = ?`,
+                [refundAmountLocal, data.dollarAmount, data.walletId],
             );
         });
 
         return { success: true };
     } catch (error: any) {
-        Alert.alert(
-            'Delete Failed',
-            error.message || 'An unexpected error occurred',
-        );
-        return { success: false, error };
+        console.error('[DB] Delete Failed:', error.message || error);
+        return { success: false, error: error.message };
     }
 }
 
@@ -404,6 +551,7 @@ type Wallet = {
     id: number;
     name: string;
     amount: number;
+    dollarAmount: number;
     currency: string;
 };
 
@@ -415,25 +563,12 @@ export async function fetchWallets(): Promise<Wallet[]> {
     return result;
 }
 
-export async function fetchFilteredExpenses(filters: {
-    startDate?: string;
-    endDate?: string;
-    category?: string;
-}) {
+export async function fetchFilteredExpenses(filters: { category?: string }) {
     const database = await getDB();
     if (!database) return [];
 
     let query = `SELECT * FROM expenses WHERE 1=1`;
-    const params: (string | number)[] = [];
-
-    if (filters.startDate && filters.startDate.length > 0) {
-        query += ` AND date >= ?`;
-        params.push(filters.startDate);
-    }
-    if (filters.endDate && filters.endDate.length > 0) {
-        query += ` AND date <= ?`;
-        params.push(filters.endDate);
-    }
+    const params: (string | number | null | undefined)[] = [];
 
     if (filters.category && filters.category !== 'All') {
         query += ` AND category = ?`;
@@ -445,15 +580,21 @@ export async function fetchFilteredExpenses(filters: {
     try {
         return await getAllAsyncSafe('fetchFilteredExpenses', query, params);
     } catch (error) {
-        Alert.alert(`SQLite Filter Error: ${error}`);
+        console.error(`[DB] SQLite Filter Error: ${error}`);
         return [];
     }
 }
 
 export async function getDailyTotal(date: string): Promise<number> {
+    if (!date) {
+        console.warn('[DB] getDailyTotal: date is missing');
+        return 0;
+    }
+
+    // Changed SUM(amount) to SUM(dollarAmount) to support mixed currencies
     const result: any = await getFirstAsyncSafe(
         'getDailyTotal',
-        `SELECT ROUND(SUM(amount), 2) as total FROM expenses WHERE date = ?`,
+        `SELECT ROUND(SUM(dollarAmount), 2) as total FROM expenses WHERE date = ?`,
         [date],
     );
 
@@ -461,9 +602,15 @@ export async function getDailyTotal(date: string): Promise<number> {
 }
 
 export async function getMonthlyTotal(monthPrefix: string): Promise<number> {
+    if (!monthPrefix) {
+        console.warn('[DB] getMonthlyTotal: monthPrefix is missing');
+        return 0;
+    }
+
+    // Changed SUM(amount) to SUM(dollarAmount)
     const result: any = await getFirstAsyncSafe(
         'getMonthlyTotal',
-        `SELECT ROUND(SUM(amount), 2) as total FROM expenses WHERE date LIKE ?`,
+        `SELECT ROUND(SUM(dollarAmount), 2) as total FROM expenses WHERE date LIKE ?`,
         [`${monthPrefix}%`],
     );
 
