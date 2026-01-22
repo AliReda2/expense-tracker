@@ -46,7 +46,7 @@ export default function Home() {
     'General',
   ];
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     const data = await fetchFilteredExpenses({
       category: filterCategory,
     });
@@ -59,16 +59,17 @@ export default function Home() {
       getDailyTotal(todayStr),
       getMonthlyTotal(monthPrefix),
     ]);
+
     setTodayTotal(daily);
     setMonthTotal(monthly);
-  };
+  }, [filterCategory]);
 
   const { refreshing, onRefresh } = useRefresh(loadData);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [filterCategory]),
+    }, [loadData]),
   );
 
   const resetFilters = () => {

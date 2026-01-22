@@ -1,7 +1,7 @@
 import { CURRENCIES } from '@/constants/currencies';
 import { fetchWalletById, updateWallet } from '@/lib/db';
 import { useLocalSearchParams, useRouter } from 'expo-router'; // 1. Use useLocalSearchParams
-import React, { useEffect, useState } from 'react'; // 2. Add useEffect
+import React, { useCallback, useEffect, useState } from 'react'; // 2. Add useEffect
 import {
   Alert,
   FlatList,
@@ -29,14 +29,10 @@ const EditWallet = () => {
   const [currency, setCurrency] = useState('USD');
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
 
-  useEffect(() => {
-    if (id) {
-      loadData();
-    }
-  }, [id]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
+      if (!id) return;
+
       const data: Wallet | null = await fetchWalletById(id);
       if (data) {
         setName(data.name);
@@ -46,7 +42,11 @@ const EditWallet = () => {
     } catch (error) {
       Alert.alert('Could not load wallet details.', `Error: ${error}`);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleCurrencySelect = (code: string) => {
     setCurrency(code);

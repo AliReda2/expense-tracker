@@ -1,7 +1,7 @@
 import { CURRENCIES } from '@/constants/currencies';
 import { fetchWallets, insertExpense } from '@/lib/db';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Chip, Text, TextInput } from 'react-native-paper';
 
@@ -46,17 +46,21 @@ export default function AddExpense() {
 
   const [note, setNote] = useState(params.note ? (params.note as string) : '');
 
-  // --- LOAD WALLETS ---
+  const didInit = useRef(false);
+
   useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
+
     async function loadWallets() {
       const result = await fetchWallets();
       setWallets(result);
 
-      // For the add screen, default to the first wallet if none is selected
-      if (!selectedWalletId && result.length > 0) {
+      if (result.length > 0) {
         setSelectedWalletId(result[0].id);
       }
     }
+
     loadWallets();
   }, []);
 

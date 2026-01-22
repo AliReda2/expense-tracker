@@ -42,20 +42,20 @@ const ViewExpenses = () => {
     'General',
   ];
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     const data = await fetchFilteredExpenses({
       category: filterCategory,
     });
 
     setExpenses(data as Expense[]);
-  };
+  }, [filterCategory]);
 
   const { refreshing, onRefresh } = useRefresh(loadData);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [filterCategory]),
+    }, [loadData]),
   );
 
   const handleDelete = async (id: number) => {
@@ -123,29 +123,29 @@ const ViewExpenses = () => {
           </View>
         }
         renderItem={({ item }) => (
-            <SwipeableExpenseRow
-              item={item}
-              onDelete={() => handleDelete(item.id)}
-              onPress={() =>
-                router.push({
-                  pathname: '/edit',
-                  params: {
-                    id: item.id,
-                    amount: item.amount.toString(),
-                    note: item.note,
-                    date: item.date,
-                    category: item.category,
-                    walletId: item.walletId ?? undefined,
-                    currency: item.currency,
-                  },
-                })
-              }
-            />
-          )}
-        />
-      </View>
-    );
-  };
+          <SwipeableExpenseRow
+            item={item}
+            onDelete={() => handleDelete(item.id)}
+            onPress={() =>
+              router.push({
+                pathname: '/edit',
+                params: {
+                  id: item.id,
+                  amount: item.amount.toString(),
+                  note: item.note,
+                  date: item.date,
+                  category: item.category,
+                  walletId: item.walletId ?? undefined,
+                  currency: item.currency,
+                },
+              })
+            }
+          />
+        )}
+      />
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#f8f9fa' },

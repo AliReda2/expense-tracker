@@ -16,7 +16,6 @@ type Wallet = {
 export default function EditExpense() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const isEditing = true;
 
   const categories = [
     'Food',
@@ -52,11 +51,6 @@ export default function EditExpense() {
     async function loadWallets() {
       const result = await fetchWallets();
       setWallets(result);
-
-      // For the edit screen, do not override an explicitly selected wallet
-      if (!isEditing && !selectedWalletId && result.length > 0) {
-        setSelectedWalletId(result[0].id);
-      }
     }
     loadWallets();
   }, []);
