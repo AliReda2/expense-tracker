@@ -1,12 +1,14 @@
+import { formatMoney } from '@/utils/formatMoney';
 import { Text, View } from 'react-native';
 
-type Props = {
+type Expense = {
   amount: number;
+  currency: string;
   note: string;
   date: string;
 };
 
-export default function ExpenseCard({ amount, note, date }: Props) {
+export default function ExpenseCard({ amount, currency, note, date }: Expense) {
   return (
     <View
       style={{
@@ -21,7 +23,7 @@ export default function ExpenseCard({ amount, note, date }: Props) {
       }}
     >
       <Text style={{ fontWeight: 'bold', fontSize: 16 }}>
-        ${amount.toFixed(2)}
+        {formatMoney(amount, currency)}
       </Text>
       <Text style={{ color: '#555', marginTop: 4 }}>{note}</Text>
       <Text style={{ color: '#999', marginTop: 4, fontSize: 12 }}>

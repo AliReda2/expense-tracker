@@ -9,6 +9,7 @@ interface SwipeableRowProps {
   item: {
     id: number;
     amount: number;
+    currency: string;
     note: string;
     date: string;
   };
@@ -41,7 +42,12 @@ export const SwipeableExpenseRow = ({
     >
       {/* Wrap the card in a Pressable to trigger the Edit navigation */}
       <Pressable onPress={onPress}>
-        <ExpenseCard amount={item.amount} note={item.note} date={item.date} />
+        <ExpenseCard
+          amount={item.amount}
+          currency={item.currency}
+          note={item.note}
+          date={item.date}
+        />
       </Pressable>
     </Swipeable>
   );
