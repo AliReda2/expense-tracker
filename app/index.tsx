@@ -11,19 +11,23 @@ import {
   View,
 } from 'react-native';
 
+import { Picker } from '@react-native-picker/picker';
+
 import MonthlyChart from '@/components/MonthlyChart';
 import {
+  fetchDates,
   fetchFilteredExpenses,
   getDailyTotal,
   getMonthlyTotal,
 } from '../lib/db';
 
 import WalletsContainer from '@/components/WalletsContainer';
-import { Button, Chip } from 'react-native-paper';
+import { Chip } from 'react-native-paper';
 
 type Expense = {
   id: number;
   amount: number;
+  dollarAmount: number;
   note: string;
   date: string;
   category: string;
@@ -46,15 +50,24 @@ export default function Home() {
     'General',
   ];
 
+  const [dates, setDates] = useState<string[]>([]);
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+
   const loadData = useCallback(async () => {
     const data = await fetchFilteredExpenses({
       category: filterCategory,
+      date: selectedDate,
     });
+
+    setDates(await fetchDates());
 
     setExpenses(data as Expense[]);
 
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const monthPrefix = format(new Date(), 'yyyy-MM');
+    const todayStr = selectedDate || format(new Date(), 'yyyy-MM-dd');
+    const monthPrefix = selectedDate
+      ? selectedDate.slice(0, 7)
+      : format(new Date(), 'yyyy-MM');
+
     const [daily, monthly] = await Promise.all([
       getDailyTotal(todayStr),
       getMonthlyTotal(monthPrefix),
@@ -62,7 +75,7 @@ export default function Home() {
 
     setTodayTotal(daily);
     setMonthTotal(monthly);
-  }, [filterCategory]);
+  }, [filterCategory, selectedDate]);
 
   const { refreshing, onRefresh } = useRefresh(loadData);
 
@@ -110,15 +123,22 @@ export default function Home() {
         {/* 2. Filter Section */}
         <View style={styles.filterHeader}>
           <Text style={styles.sectionTitle}>Filters</Text>
-          {isFiltered && (
-            <Button
-              mode="text"
-              compact
-              onPress={resetFilters}
-              textColor="#ff8c00"
+
+          <View style={{ width: 200 }}>
+            <Picker
+              selectedValue={selectedDate}
+              onValueChange={(value) => setSelectedDate(value)}
             >
-              Clear All
-            </Button>
+              {dates.map((date) => (
+                <Picker.Item key={date} label={date} value={date} />
+              ))}
+            </Picker>
+          </View>
+
+          {isFiltered && (
+            <Pressable onPress={resetFilters}>
+              <Text style={{ color: '#ff8c00', fontSize: 14 }}>Clear All</Text>
+            </Pressable>
           )}
         </View>
 

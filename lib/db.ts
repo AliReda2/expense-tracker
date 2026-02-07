@@ -564,7 +564,10 @@ export async function fetchWallets(): Promise<Wallet[]> {
   return result;
 }
 
-export async function fetchFilteredExpenses(filters: { category?: string }) {
+export async function fetchFilteredExpenses(filters: {
+  category?: string;
+  date?: string;
+}) {
   const database = await getDB();
   if (!database) return [];
 
@@ -576,6 +579,11 @@ export async function fetchFilteredExpenses(filters: { category?: string }) {
     params.push(filters.category);
   }
 
+  if (filters.date) {
+    query += ` AND date = ?`;
+    params.push(filters.date);
+  }
+
   query += ` ORDER BY date DESC`;
 
   try {
@@ -584,6 +592,17 @@ export async function fetchFilteredExpenses(filters: { category?: string }) {
     console.error(`[DB] SQLite Filter Error: ${error}`);
     return [];
   }
+}
+
+export async function fetchDates(): Promise<string[]> {
+  const database = await getDB();
+  if (!database) return [];
+
+  const sql = `SELECT DISTINCT date FROM expenses ORDER BY date DESC`;
+
+  const rows = await database.getAllAsync<{ date: string }>(sql);
+
+  return rows.map((row) => row.date);
 }
 
 export async function getDailyTotal(date: string): Promise<number> {

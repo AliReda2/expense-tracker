@@ -2,7 +2,7 @@ import { Dimensions, Text, View } from 'react-native';
 import { BarChart } from 'react-native-chart-kit';
 
 interface ChartProps {
-  expenses: { amount: number; date: string }[];
+  expenses: { dollarAmount: number; date: string }[];
 }
 
 export default function MonthlyChart({ expenses }: ChartProps) {
@@ -12,7 +12,7 @@ export default function MonthlyChart({ expenses }: ChartProps) {
   const dailyTotals = expenses.reduce(
     (acc, curr) => {
       const day = parseInt(curr.date.split('-')[2], 10);
-      acc[day] = (acc[day] || 0) + curr.amount;
+      acc[day] = (acc[day] || 0) + curr.dollarAmount;
       return acc;
     },
     {} as Record<number, number>
